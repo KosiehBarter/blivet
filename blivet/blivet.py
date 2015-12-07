@@ -27,6 +27,7 @@ import contextlib
 import time
 import parted
 import functools
+import xml_tools
 
 
 from pykickstart.constants import AUTOPART_TYPE_LVM, CLEARPART_TYPE_ALL, CLEARPART_TYPE_LINUX, CLEARPART_TYPE_LIST, CLEARPART_TYPE_NONE
@@ -1892,3 +1893,9 @@ class Blivet(object):
         """
 
         self.fsset.set_fstab_swaps(devices)
+
+    def to_xml(self):
+        """
+        Gather current data and export them to .XML file.
+        """
+        pass
