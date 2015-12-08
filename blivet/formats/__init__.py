@@ -31,7 +31,7 @@ import importlib
 
 from ..util import get_sysfs_path_by_name
 from ..util import run_program
-from ..util import ObjectID
+from ..xml_util import XMLUtils as ObjectID
 from ..storage_log import log_method_call
 from ..errors import DeviceFormatError, FormatCreateError, FormatDestroyError, FormatSetupError
 from ..i18n import N_
