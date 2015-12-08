@@ -906,7 +906,6 @@ class PartitionDevice(StorageDevice):
             self.xml_list.append(ET.SubElement(self.xml_root, "{}".format(inc)))
 
         self.xml_tree = ET.ElementTree(self.xml_root)
-        indent(self.xml_tree)
         return self.xml_tree
 
 
