@@ -45,6 +45,8 @@ from .storage import StorageDevice
 from .dm import DMDevice
 from .lib import device_path_to_name, device_name_to_disk_by_path, LINUX_SECTOR_SIZE
 
+import xml.etree.ElementTree as ET
+
 DEFAULT_PART_SIZE = Size("500MiB")
 
 # in case the default partition size doesn't fit
@@ -891,3 +893,41 @@ class PartitionDevice(StorageDevice):
 
             if data.resize:
                 data.size = self.size.convert_to(MiB)
+
+    def to_xml(self):
+        """ Export data to XML format and then return them to the caller.
+
+            Returns: A XML string
+        """
+
+        self.xml_root = ET.Element(self.name)
+        self.xml_list = []
+        for inc in (self.path, self.format.uuid, int(self.size), self.parents):
+            self.xml_list.append(ET.SubElement(self.xml_root, "{}".format(inc)))
+
+        self.xml_tree = ET.ElementTree(self.xml_root)
+        indent(self.xml_tree)
+        return self.xml_tree
+
+
+'''
+copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint
+it basically walks your tree and adds spaces and newlines so the tree is
+printed in a nice way
+
+Mod by kvalek@redhat.com
+'''
+def indent(elem, level=0):
+    i = "\n" + level*"\t"
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = i + "\t"
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        for elem in elem:
+            indent(elem, level+1)
+        if not elem.tail or not elem.tail.strip():
+            elem.tail = i
+        else:
+            if level and (not elem.tail or not elem.tail.strip()):
+                elem.tail = i
