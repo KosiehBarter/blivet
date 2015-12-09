@@ -38,6 +38,8 @@ from ..errors import DeviceFormatError, FormatCreateError, FormatDestroyError, F
 from ..i18n import N_
 from ..size import Size
 
+import xml.etree.ElementTree as ET
+
 import logging
 log = logging.getLogger("blivet")
 
@@ -631,6 +633,22 @@ class DeviceFormat(ObjectID):
         data.format = not self.exists
         data.fstype = self.type
         data.mountpoint = self.ks_mountpoint
+
+    def to_xml(self):
+        """ Export data to XML format and then return them to the caller.
+
+            Returns: A XML string
+        """
+        self.xml_root = self.name
+
+        self.xml_list = []
+        self.list_of_attrs = ["object_id", "uuid", "exists", "options", "device", "resizable", "supported"]
+
+        for inc in range(len(self.list_of_attrs)):
+            self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
+            self.xml_list[inc].set("value", getattr(self, self.list_of_attrs[inc]))
+
+        self.xml_tree = ET.ElementTree(self.xml_root)
 
 register_device_format(DeviceFormat)
 
