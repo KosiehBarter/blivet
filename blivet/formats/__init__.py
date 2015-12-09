@@ -639,7 +639,7 @@ class DeviceFormat(ObjectID):
 
             Returns: A XML string
         """
-        self.xml_root = self.name
+        self.xml_root = ET.Element(self.name)
 
         self.xml_list = []
         self.list_of_attrs = ["object_id", "uuid", "exists", "options", "device", "resizable", "supported"]
