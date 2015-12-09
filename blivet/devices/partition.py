@@ -899,34 +899,13 @@ class PartitionDevice(StorageDevice):
 
             Returns: A XML string
         """
+        self.xml_root = self.name
 
-        self.xml_root = ET.Element(self.name)
         self.xml_list = []
-        for inc in (self.path, self.format.uuid, int(self.size), self.parents):
-            self.xml_list.append(ET.SubElement(self.xml_root, "{}".format(inc)))
+        self.list_of_attrs = ["path", "format", "size", "parents"]
+
+        for inc in range(len(self.list_of_attrs)):
+            self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
+            self.xml_list[inc].set("value", getattr(self, self.list_of_attrs[inc]))
 
         self.xml_tree = ET.ElementTree(self.xml_root)
-        return self.xml_tree
-
-
-'''
-copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint
-it basically walks your tree and adds spaces and newlines so the tree is
-printed in a nice way
-
-Mod by kvalek@redhat.com
-'''
-def indent(elem, level=0):
-    i = "\n" + level*"\t"
-    if len(elem):
-        if not elem.text or not elem.text.strip():
-            elem.text = i + "\t"
-        if not elem.tail or not elem.tail.strip():
-            elem.tail = i
-        for elem in elem:
-            indent(elem, level+1)
-        if not elem.tail or not elem.tail.strip():
-            elem.tail = i
-        else:
-            if level and (not elem.tail or not elem.tail.strip()):
-                elem.tail = i
