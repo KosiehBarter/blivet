@@ -903,11 +903,11 @@ class PartitionDevice(StorageDevice):
         self.xml_root = ET.Element(self.name)
 
         self.xml_list = []
-        self.list_of_attrs = ["name", "size"]
+        self.list_of_attrs = ["name", "size", "size", "parents", "sysfs_path", "exists", "bootable", "req_start_sector", "req_end_sector", "part_type"]
 
         for inc in range(len(self.list_of_attrs)):
             self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
-            print (self.list_of_attrs[inc])
+            self.xml_list[inc].set("val", getattr(self, self.list_of_attrs[inc]))
 
         self.xml_tree = ET.ElementTree(self.xml_root)
         return self.xml_tree
