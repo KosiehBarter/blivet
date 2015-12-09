@@ -895,17 +895,19 @@ class PartitionDevice(StorageDevice):
                 data.size = self.size.convert_to(MiB)
 
     def to_xml(self):
-        """ Export data to XML format and then return them to the caller.
+        """
+            Export data to XML format and then return them to the caller.
 
             Returns: A XML string
         """
         self.xml_root = ET.Element(self.name)
 
         self.xml_list = []
-        self.list_of_attrs = ["path", "format", "size", "parents"]
+        self.list_of_attrs = ["name", "size"]
 
         for inc in range(len(self.list_of_attrs)):
             self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
-            self.xml_list[inc].set("value", getattr(self, self.list_of_attrs[inc]))
+            print (self.list_of_attrs[inc])
 
         self.xml_tree = ET.ElementTree(self.xml_root)
+        return self.xml_tree

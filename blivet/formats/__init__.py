@@ -646,9 +646,9 @@ class DeviceFormat(ObjectID):
 
         for inc in range(len(self.list_of_attrs)):
             self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
-            self.xml_list[inc].set("value", getattr(self, self.list_of_attrs[inc]))
 
         self.xml_tree = ET.ElementTree(self.xml_root)
+        return self.xml_tree
 
 register_device_format(DeviceFormat)
 
