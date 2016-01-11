@@ -18,6 +18,8 @@ from contextlib import contextmanager
 from functools import wraps
 from collections import namedtuple
 
+import xml.etree.ElementTree as ET
+
 import gi
 gi.require_version("BlockDev", "1.0")
 
@@ -621,6 +623,113 @@ class ObjectID(object):
         self = super(ObjectID, cls).__new__(cls)
         self.id = self._newid_gen()  # pylint: disable=attribute-defined-outside-init
         return self
+
+    def to_xml(self, **kwargs):
+        """
+            Export data to XML format and then return them to the caller.
+
+            :param list input_data: List of specific attributes as strings to get from object
+            :param ET.Element par_elem: A parent element to append subelements to.
+
+            Returns: A XML string
+        """
+        ## General
+        full_dump = kwargs.get("full_dump")
+        xml_root = ET.Element("Blivet-XML")
+        xml_list = [ET.SubElement(xml_root, str(self.__class__).split("'")[1].split(".")[-1])]
+        counter = 0
+
+        if hasattr(self, "_to_xml_iterate"):
+            xml_list.append(self._to_xml_iterate(root_elem = xml_root, master_list = xml_list, parent_elem = xml_list[0], full_dump = full_dump))
+
+        ## Indent and return if stated
+        self._to_xml_indent(xml_root)
+        return xml_root
+
+    def _to_xml_iterate(self, **kwargs):
+        """
+            A to_xml() subfunction to actually gather data from objects.
+            :param ET.Element root_elem: A root element to append to.
+        """
+        ## General
+        xml_root = kwargs.get("root_elem")
+        xml_parent = kwargs.get("parent_elem")
+        xml_master_list = kwargs.get("master_list")
+        ## Condition for internal counter
+        inter_counter = kwargs.get("inter_counter")
+        if inter_counter == None:
+            inter_counter = 0
+        xml_sublist = []
+        counter = 0
+
+        ## Set input_data to gather
+        if kwargs.get("full_dump"):
+            input_data = self.__dict__
+            full_dump = True
+        else:
+            input_data = self._to_xml_set_attrs()
+            full_dump = None
+
+        ## Iterate
+        for inc in input_data:
+            ## If the attribute has to_xml() function
+            if hasattr(getattr(self, inc), "_to_xml_iterate"):
+                xml_master_list.append(ET.SubElement(xml_root, str(type(getattr(self, inc))).split("'")[1].split(".")[-1]))
+                inter_counter += 1
+                print (xml_master_list[inter_counter])
+                #xml_sublist.append(self._to_xml_iterate(root_elem = xml_root, master_list = xml_master_list, parent_elem = xml_master_list[inter_counter], full_dump = full_dump, inter_counter = inter_counter))
+            else:
+                xml_sublist.append(ET.SubElement(xml_parent, "prop"))
+
+        self._to_xml_indent(xml_parent)
+
+    def _to_xml_parse_list(self, input_list, parent_index):
+        """
+            This function basically parses a list into indenpendent elements
+        """
+        temp_list = []
+        if input_list == []:
+            temp_list.append(ET.SubElement(parent_index, str(None)))
+        else:
+            for inc in input_list:
+                if type(inc) != str:
+                    temp_list.append(ET.SubElement(parent_index, str(inc).split("'")[1].split(".")[-1]))
+                else:
+                    temp_list.append(ET.SubElement(parent_index, "item", {"value": inc}))
+
+
+    def _to_xml_set_data(self, elem, tag):
+        """
+            Sets element attribute at one place
+
+            :param ET.Element elem: A ET.Element item (capable to perform ET.Element operations)
+            :param str tag: a string name of a attribute (eg name, path...)
+        """
+        elem.set("attr", str(tag))
+        elem.set("type", str(type(getattr(self, tag))).split("\'")[1])
+        elem.set("value", str(getattr(self, tag)))
+
+    '''
+    copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint
+    it basically walks your tree and adds spaces and newlines so the tree is
+    printed in a nice way
+
+    Mod by kvalek@redhat.com
+    '''
+    def _to_xml_indent(self, elem, level=0):
+        i = "\n" + level*"\t"
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = i + "\t"
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            for elem in elem:
+                self._to_xml_indent(elem, level+1)
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            else:
+                if level and (not elem.tail or not elem.tail.strip()):
+                    elem.tail = i
 
 
 def canonicalize_UUID(a_uuid):
