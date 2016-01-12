@@ -654,6 +654,10 @@ class ObjectID(object):
         ## General
         xml_root = kwargs.get("root_elem")
         xml_parent = kwargs.get("parent_elem")
+
+        xml_parent_origin = kwargs.get("parent_origin") ## Not to be confused, this is element that the new element was created from - eg DiskLabel from DiskDevice!
+        xml_parent.set("id", str(getattr(self, "id")))
+
         xml_master_list = kwargs.get("master_list")
         ## Condition for internal counter
         inter_counter = kwargs.get("inter_counter")
@@ -670,32 +674,65 @@ class ObjectID(object):
             input_data = self._to_xml_set_attrs()
             full_dump = None
 
+        ## If the Object is dumped as subclass of another
+        if xml_parent_origin != None:
+            xml_sublist.append(ET.SubElement(xml_parent, "ParentInstance"))
+            xml_sublist[-1].text = str(xml_parent_origin)
+
         ## Iterate
         for inc in input_data:
+
             ## If the attribute has to_xml() function
-            if hasattr(getattr(self, inc), "_to_xml_iterate"):
+            if hasattr(getattr(self, inc), "to_xml"):
                 xml_master_list.append(ET.SubElement(xml_root, str(type(getattr(self, inc))).split("'")[1].split(".")[-1]))
                 inter_counter += 1
-                print (xml_master_list[inter_counter])
-                #xml_sublist.append(self._to_xml_iterate(root_elem = xml_root, master_list = xml_master_list, parent_elem = xml_master_list[inter_counter], full_dump = full_dump, inter_counter = inter_counter))
+                getattr(self, inc)._to_xml_iterate(root_elem = xml_root, master_list = xml_master_list, parent_elem = xml_master_list[inter_counter], full_dump = full_dump, parent_origin = getattr(self, "id"))
+
+            ## If the attribute is a list
+            elif type(getattr(self, inc)) == list or str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
+                xml_sublist.append(ET.SubElement(xml_parent, "list"))
+                xml_sublist[-1].set("attr", str(inc))
+                xml_sublist[-1].set("type", str(type(getattr(self, inc))).split("\'")[1])
+
+                ## If the list is complicated
+                if str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
+                    temp_result = getattr(getattr(self, inc), "items")
+
+                    if temp_result != None:
+                        list_result = []
+                        for enc in temp_result:
+                            list_result.append(str(type(enc).split("'")[1].split(".")[-1]), getattr(inc, "id"))
+                    else:
+                        list_result = temp_result
+
+                ## If the list is "pure"
+                else:
+                    list_result = getattr(self, inc)
+
+                ## Perform parsing of the list
+                self._to_xml_parse_list(list_result, xml_sublist[-1])
+
             else:
                 xml_sublist.append(ET.SubElement(xml_parent, "prop"))
+                self._to_xml_set_data(xml_sublist[-1], inc)
 
-        self._to_xml_indent(xml_parent)
+        self._to_xml_indent(xml_parent[0])
 
     def _to_xml_parse_list(self, input_list, parent_index):
         """
             This function basically parses a list into indenpendent elements
         """
         temp_list = []
-        if input_list == []:
-            temp_list.append(ET.SubElement(parent_index, str(None)))
+        if input_list == [] or input_list == None:
+            temp_list.append(ET.SubElement(parent_index, "item"))
+            temp_list[-1].text = str(None)
         else:
             for inc in input_list:
-                if type(inc) != str:
-                    temp_list.append(ET.SubElement(parent_index, str(inc).split("'")[1].split(".")[-1]))
+                if type(inc) == tuple:
+                    temp_list.append(ET.SubElement(parent_index, inc[0], {"id": inc[1]}))
                 else:
-                    temp_list.append(ET.SubElement(parent_index, "item", {"value": inc}))
+                    temp_list.append(ET.SubElement(parent_index, "item"))
+                    temp_list[-1].text = inc
 
 
     def _to_xml_set_data(self, elem, tag):
@@ -707,7 +744,8 @@ class ObjectID(object):
         """
         elem.set("attr", str(tag))
         elem.set("type", str(type(getattr(self, tag))).split("\'")[1])
-        elem.set("value", str(getattr(self, tag)))
+        #elem.set("value", str(getattr(self, tag)))
+        elem.text = str(getattr(self, tag))
 
     '''
     copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint
@@ -730,7 +768,6 @@ class ObjectID(object):
             else:
                 if level and (not elem.tail or not elem.tail.strip()):
                     elem.tail = i
-
 
 def canonicalize_UUID(a_uuid):
     """ Converts uuids to canonical form.
