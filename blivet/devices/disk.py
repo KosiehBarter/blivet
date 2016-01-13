@@ -46,7 +46,6 @@ from .container import ContainerDevice
 from .network import NetworkStorageDevice
 from .dm import DMDevice
 
-
 class DiskDevice(StorageDevice):
 
     """ A local/generic disk.
@@ -122,6 +121,9 @@ class DiskDevice(StorageDevice):
             raise errors.DeviceError("cannot destroy disk with no media", self.name)
 
         StorageDevice._pre_destroy(self)
+
+    def _to_xml_set_attrs(self):
+        return ["id", "name", "path", "size", "format", "parents", "sysfs_path"]
 
 
 class DiskFile(DiskDevice):

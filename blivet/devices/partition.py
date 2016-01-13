@@ -45,8 +45,6 @@ from .storage import StorageDevice
 from .dm import DMDevice
 from .lib import device_path_to_name, device_name_to_disk_by_path, LINUX_SECTOR_SIZE
 
-import xml.etree.ElementTree as ET
-
 DEFAULT_PART_SIZE = Size("500MiB")
 
 # in case the default partition size doesn't fit
@@ -894,20 +892,5 @@ class PartitionDevice(StorageDevice):
             if data.resize:
                 data.size = self.size.convert_to(MiB)
 
-    def to_xml(self):
-        """
-            Export data to XML format and then return them to the caller.
-
-            Returns: A XML string
-        """
-        self.xml_root = ET.Element(self.name)
-
-        self.xml_list = []
-        self.list_of_attrs = ["name", "size", "size", "parents", "sysfs_path", "exists", "bootable", "req_start_sector", "req_end_sector", "part_type"]
-
-        for inc in range(len(self.list_of_attrs)):
-            self.xml_list.append(ET.SubElement(self.xml_root, self.list_of_attrs[inc]))
-            self.xml_list[inc].set("val", getattr(self, self.list_of_attrs[inc]))
-
-        self.xml_tree = ET.ElementTree(self.xml_root)
-        return self.xml_tree
+    def _to_xml_set_attrs(self):
+        return ["id", "name", "path", "size", "format", "parents", "sysfs_path"]

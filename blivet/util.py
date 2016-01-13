@@ -663,6 +663,7 @@ class ObjectID(object):
         inter_counter = kwargs.get("inter_counter")
         if inter_counter == None:
             inter_counter = 0
+
         xml_sublist = []
         counter = 0
 
@@ -671,12 +672,16 @@ class ObjectID(object):
             input_data = self.__dict__
             full_dump = True
         else:
-            input_data = self._to_xml_set_attrs()
-            full_dump = None
+            if hasattr(self, "_to_xml_set_attrs"):
+                input_data = self._to_xml_set_attrs()
+                full_dump = None
+            else:
+                input_data = self.__dict__
+                full_dump = None
 
         ## If the Object is dumped as subclass of another
         if xml_parent_origin != None:
-            xml_sublist.append(ET.SubElement(xml_parent, "ParentInstance"))
+            xml_sublist.append(ET.SubElement(xml_parent, "Parent_Instance_ID"))
             xml_sublist[-1].text = str(xml_parent_origin)
 
         ## Iterate
@@ -686,6 +691,7 @@ class ObjectID(object):
             if hasattr(getattr(self, inc), "to_xml"):
                 xml_master_list.append(ET.SubElement(xml_root, str(type(getattr(self, inc))).split("'")[1].split(".")[-1]))
                 inter_counter += 1
+
                 getattr(self, inc)._to_xml_iterate(root_elem = xml_root, master_list = xml_master_list, parent_elem = xml_master_list[inter_counter], full_dump = full_dump, parent_origin = getattr(self, "id"))
 
             ## If the attribute is a list
@@ -693,24 +699,8 @@ class ObjectID(object):
                 xml_sublist.append(ET.SubElement(xml_parent, "list"))
                 xml_sublist[-1].set("attr", str(inc))
                 xml_sublist[-1].set("type", str(type(getattr(self, inc))).split("\'")[1])
-
-                ## If the list is complicated
-                if str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
-                    temp_result = getattr(getattr(self, inc), "items")
-
-                    if temp_result != None:
-                        list_result = []
-                        for enc in temp_result:
-                            list_result.append(str(type(enc).split("'")[1].split(".")[-1]), getattr(inc, "id"))
-                    else:
-                        list_result = temp_result
-
-                ## If the list is "pure"
-                else:
-                    list_result = getattr(self, inc)
-
-                ## Perform parsing of the list
-                self._to_xml_parse_list(list_result, xml_sublist[-1])
+                ## parse object as list
+                self._to_xml_parse_list(getattr(self, inc), xml_sublist[-1])
 
             else:
                 xml_sublist.append(ET.SubElement(xml_parent, "prop"))
@@ -718,22 +708,30 @@ class ObjectID(object):
 
         self._to_xml_indent(xml_parent[0])
 
-    def _to_xml_parse_list(self, input_list, parent_index):
+    def _to_xml_parse_list(self, input_object, parent_index):
         """
             This function basically parses a list into indenpendent elements
         """
-        temp_list = []
-        if input_list == [] or input_list == None:
-            temp_list.append(ET.SubElement(parent_index, "item"))
-            temp_list[-1].text = str(None)
-        else:
-            for inc in input_list:
-                if type(inc) == tuple:
-                    temp_list.append(ET.SubElement(parent_index, inc[0], {"id": inc[1]}))
-                else:
-                    temp_list.append(ET.SubElement(parent_index, "item"))
-                    temp_list[-1].text = inc
+        xml_parse_sublist = []
 
+        ## If the input_object is "pure" list
+        if type(input_object) == list:
+            for inc in input_object:
+                xml_parse_sublist.append(ET.SubElement(parent_index, "item"))
+                xml_parse_sublist[-1].text = str(inc)
+
+        ## If the input_object is ParentList
+        elif hasattr(input_object, "items") == True:
+            if getattr(input_object, "items") == []:
+                xml_parse_sublist.append(ET.SubElement(parent_index, "item"))
+                xml_parse_sublist[-1].text = str(None)
+            else:
+                for inc in getattr(input_object, "items"):
+                    xml_parse_sublist.append(ET.SubElement(parent_index, "item", {"type": "id"}))
+                    xml_parse_sublist[-1].text = str(self._getdeepattr(inc, "id"))
+        else:
+            xml_parse_sublist.append(ET.SubElement(parent_index, "item"))
+            xml_parse_sublist[-1].text = str(None)
 
     def _to_xml_set_data(self, elem, tag):
         """
@@ -768,6 +766,43 @@ class ObjectID(object):
             else:
                 if level and (not elem.tail or not elem.tail.strip()):
                     elem.tail = i
+
+    def _getdeepattr(self, obj, name):
+        """This behaves as the standard getattr, but supports
+           composite (containing dots) attribute names.
+
+           As an example:
+
+           >>> import os
+           >>> from os.path import split
+           >>> getdeepattr(os, "path.split") == split
+           True
+
+           Note by kvalek@redhat.com: copied from anaconda/pyanaconda/iutil.py, original author(s) is / are mentioned here.
+        """
+
+        for attr in name.split("."):
+            obj = getattr(obj, attr)
+        return obj
+
+    def _hasdeepattr(self, obj, name):
+        """
+            This behaves like _getdeepattr, but returns a booolean if True or False if not.
+            Implementation by kvalek@redhat.com, inspired by getdeepattr
+
+            Example (can be modded to be standalone - just remove selfs and begining underscore):
+
+            dap2._hasdeepattr(dap2, "parents.items")
+            True
+
+        """
+        for attr in name.split("."):
+            try:
+                obj = getattr(obj, attr)
+            except AttributeError:
+                return False
+        return True
+
 
 def canonicalize_UUID(a_uuid):
     """ Converts uuids to canonical form.
