@@ -27,6 +27,8 @@ import contextlib
 import time
 import parted
 import functools
+import xml.etree.ElementTree as ET
+import socket
 
 
 from pykickstart.constants import AUTOPART_TYPE_LVM, CLEARPART_TYPE_ALL, CLEARPART_TYPE_LINUX, CLEARPART_TYPE_LIST, CLEARPART_TYPE_NONE
@@ -160,14 +162,40 @@ class Blivet(object):
         self._free_space_snapshot = None
 
     def to_xml(self):
-        ## DRAFT - DO NOT Remove
-        bo = Blivet()
-        bo.reset()
 
-        object_array = []
-        for inc in bo.devices:
-            object_array.append()
+        # Declare master element and list of elems
+        master_root_elem = ET.Element("Blivet-XML-Tools")
+        list_of_objects = []
 
+        for inc in self.devices:
+            if hasattr(inc, "to_xml"):
+                list_of_objects.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id"))}))
+                inc.to_xml(parent_elem = list_of_objects[-1], root_list = list_of_objects, root_elem = master_root_elem)
+
+        self._to_xml_indent(master_root_elem)
+        ET.ElementTree(master_root_elem).write(socket.gethostname().split(".")[0] + ".xml", xml_declaration = True, encoding = "utf-8")
+
+    '''
+    copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint
+    it basically walks your tree and adds spaces and newlines so the tree is
+    printed in a nice way
+
+    Mod by kvalek@redhat.com
+    '''
+    def _to_xml_indent(self, elem, level=0):
+        i = "\n" + level*"\t"
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = i + "\t"
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            for elem in elem:
+                self._to_xml_indent(elem, level+1)
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            else:
+                if level and (not elem.tail or not elem.tail.strip()):
+                    elem.tail = i
 
     def do_it(self, callbacks=None):
         """
