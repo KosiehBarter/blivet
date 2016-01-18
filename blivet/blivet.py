@@ -165,12 +165,13 @@ class Blivet(object):
 
         # Declare master element and list of elems
         master_root_elem = ET.Element("Blivet-XML-Tools")
-        list_of_objects = []
+        list_of_devices = []
+        list_of_formats = []
 
         for inc in self.devices:
             if hasattr(inc, "to_xml"):
-                list_of_objects.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id"))}))
-                inc.to_xml(parent_elem = list_of_objects[-1], root_list = list_of_objects, root_elem = master_root_elem)
+                list_of_devices.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id"))}))
+                inc.to_xml(parent_elem = list_of_devices[-1], root_list = list_of_devices, root_elem = master_root_elem, format_list = list_of_formats)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(socket.gethostname().split(".")[0] + ".xml", xml_declaration = True, encoding = "utf-8")

@@ -638,9 +638,10 @@ class ObjectID(object):
         parent_elem = kwargs.get("parent_elem")
         root_elem = kwargs.get("root_elem")
         root_list = kwargs.get("root_list")
+        elem_list = kwargs.get("elem_list")
+        format_list = kwargs.get("format_list")
         xml_sublist = []
         xml_child_sublist = []
-        xml_stack = []
 
         if full_dump != None and hasattr(self, "_to_xml_set_attrs"):
             input_data = self._to_xml_set_attrs()
@@ -667,20 +668,14 @@ class ObjectID(object):
 
             elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
-                xml_parse_id = self._getdeepattr(self, str(inc) + ".id")
-                if xml_stack == []:
-                    xml_stack.append((xml_parse_id, 1))
-                for enc in xml_stack:
-                    if enc[0] != xml_parse_id:
-                        xml_stack.append((xml_parse_id, 1))
-                    elif enc[0] == self._getdeepattr(self, str(inc) + ".id") and enc[1] == 1:
-                        enc = (self._getdeepattr(self, str(inc) + ".id"), 2)
-                        xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)}))
-                        xml_sublist[-1].text = str(xml_parse_id)
+                xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
+                if xml_parse_id not in format_list:
+                    format_list.append(xml_parse_id) ## MANDATORY! Adds value of ID if does not exist for check.
 
-                        ## "Return" back to root element and add element here
-                        root_list.append(ET.SubElement(root_elem, str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id"))}))
-                        getattr(self, inc).to_xml(parent_elem = root_list[-1])
+                    xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)})) ## Adds a Child_ID Element to "link" to formats section
+                    xml_sublist[-1].text = str(xml_parse_id)
+                    root_list.append(ET.SubElement(root_elem, str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id"))})) # Adds a format root elem.
+                    getattr(self, inc).to_xml(parent_elem = root_list[-1])
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
@@ -693,18 +688,15 @@ class ObjectID(object):
             This function basically parses a list into indenpendent elements
         """
         xml_sublist_items = []
-        if type(input_list) == list:
+
+        if input_list == []:
+            xml_sublist_items.append(ET.SubElement(parent_index, "item"))
+            xml_sublist_items[-1].text = str(None)
+        else:
             for inc in input_list:
                 xml_sublist_items.append(ET.SubElement(parent_index, "item"))
                 self._to_xml_set_data(elem = xml_sublist_items[-1], tag = inc, input_type = "list")
 
-        elif getattr(input_list, "items"):
-            for inc in getattr(input_list, "items"):
-                xml_sublist_items.append(ET.SubElement(parent_index, "item"))
-                self._to_xml_set_data(elem = xml_sublist_items[-1], tag = inc, input_type = "list")
-        else:
-            xml_sublist_items.append(ET.SubElement(parent_index, "item"))
-            xml_sublist_items[-1].text = str(None)
 
     def _to_xml_set_data(self, **kwargs):
         """
@@ -719,7 +711,11 @@ class ObjectID(object):
         input_type = kwargs.get("input_type")
 
         if input_type == "list":
-            elem.text = str(tag)
+            if hasattr(tag, "id"):
+                elem.text = str(getattr(tag, "id"))
+                elem.set("attr", "parent_id")
+            else:
+                elem.text = str(tag)
             elem.set("type", str(type(tag)).split("'")[1])
         else:
             elem.set("attr", str(tag))
