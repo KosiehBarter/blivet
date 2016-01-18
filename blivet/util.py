@@ -628,17 +628,32 @@ class ObjectID(object):
         """
             Export data to XML format and then return them to the caller.
 
-            :param list input_data: List of specific attributes as strings to get from object
-            :param ET.Element par_elem: A parent element to append subelements to.
+            :param bool full_dump: If to perform full dump, or not.
+            :param ET.Element parent_elem: Parent element where others are added into it.
+            :param ET.Element root_elem: Master root element, where are parent_elem-s.
+            :param list root_list: List of elements, where are parent_elem-s.
+            :param list format_list: A assist list to prevent duplicates in sub-objects.
 
-            Returns: A XML string
+            This function does not return anything at all, it just scans devices or formats
+            and converts them to elements to be stored in a valid XML file,
+            without namespaces.
+
+            The method of parsing into XML follows:
+            Firstly, a master to_xml() is executed in blivet.Blivet(). This
+            creates root element and scans for devices (or device if dump_device is not None).
+            Checks, if device or object has to_xml() (this function - nested to others) and
+            performs to_xml() on each of them.
+
+            Same technique is with formats, if device contains format that has to_xml(),
+            parser switches itself to root, then reexecutes itself on format instance and
+            parses its attributes to elements.
+
         """
         ## General
         full_dump = kwargs.get("full_dump")
         parent_elem = kwargs.get("parent_elem")
         root_elem = kwargs.get("root_elem")
         root_list = kwargs.get("root_list")
-        elem_list = kwargs.get("elem_list")
         format_list = kwargs.get("format_list")
         xml_sublist = []
         xml_child_sublist = []
@@ -679,7 +694,11 @@ class ObjectID(object):
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
-                self._to_xml_set_data(elem = xml_sublist[-1], tag = inc, full_bool = True)
+                if str(type(getattr(self, inc))).split("'")[1] == "blivet.size.Size":
+                    integer_override = True
+                else:
+                    integer_override = False
+                self._to_xml_set_data(elem = xml_sublist[-1], tag = inc, full_bool = True, integer_override = integer_override)
 
         self._to_xml_indent(parent_elem)
 
@@ -709,6 +728,7 @@ class ObjectID(object):
         tag = kwargs.get("tag")
         full_bool = kwargs.get("full_bool")
         input_type = kwargs.get("input_type")
+        integer_override = kwargs.get("integer_override")
 
         if input_type == "list":
             if hasattr(tag, "id"):
@@ -720,8 +740,14 @@ class ObjectID(object):
         else:
             elem.set("attr", str(tag))
             elem.set("type", str(type(getattr(self, tag))).split("\'")[1])
+
+            ## Decide if to re-type integers or not, mainly for size
+            if integer_override == True:
+                elem_text = str(int(getattr(self, tag)))
+            else:
+                elem_text = str(getattr(self, tag))
             if full_bool == True:
-                elem.text = str(getattr(self, tag))
+                elem.text = elem_text
 
     def _getdeepattr(self, obj, name):
         """This behaves as the standard getattr, but supports
