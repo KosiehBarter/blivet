@@ -196,7 +196,8 @@ class Blivet(object):
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
 
-    def from_xml(self):
+    def from_xml(self, input_file):
+
         pass
 
     '''
