@@ -161,7 +161,7 @@ class Blivet(object):
         self.services = set()
         self._free_space_snapshot = None
 
-    def to_xml(self, dump_device = None, custom_name = None):
+    def to_xml(self, **kwargs):
         """
             This is the master to_xml() function. It basically gathers the data and
             performs parsing to XML notation on its children.
@@ -170,7 +170,15 @@ class Blivet(object):
 
             This function is like a ignition - its run by Blivet itself and runs major part of itself
             in blivet/util.py - to_xml(), which "does the hard dirty work".
+
+            param str dump_device: name of device that will be dumped.
+            param str custom_name: custom name supplied by the user
+            param bool rec_bool: NOTE: Must be used with dump_device: decide if to dump recursively or not
         """
+        # Parse args
+        dump_device = kwargs.get("dump_device")
+        custom_name = kwargs.get("custom_name")
+        rec_bool = kwargs.get("rec_bool")
 
         # Declare master element and list of elems
         master_root_elem = ET.Element("Blivet-XML-Tools")
@@ -186,12 +194,23 @@ class Blivet(object):
 
         if dump_device == None:
             input_list = self.devices
-            file_name = file_name + ".xml"
+            file_name = file_name
         else:
             for inc in self.devices:
-                if dump_device == inc.name:
+                if rec_bool == True:
+                    if inc.name.startswith(dump_device):
+                        input_list.append(inc)
+                    else:
+                        log.error("Device %s NOT IN LIST" % dump_device)
+                elif dump_device == inc.name:
                     input_list.append(inc)
-            file_name = file_name + "-" + dump_device + ".xml"
+            file_name = file_name + "-" + dump_device
+
+        if rec_bool == True:
+            file_name = file_name + "-recursive"
+
+        ## Finally, add extension
+        file_name = file_name + ".xml"
 
         for inc in input_list:
             if hasattr(inc, "to_xml"):

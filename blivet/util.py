@@ -800,8 +800,9 @@ class ObjectID(object):
                 if level and (not elem.tail or not elem.tail.strip()):
                     elem.tail = i
 
-    def from_xml(self):
+    def from_xml(self, **kwargs):
         pass
+
 
 def canonicalize_UUID(a_uuid):
     """ Converts uuids to canonical form.
