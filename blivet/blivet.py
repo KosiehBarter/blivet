@@ -161,7 +161,7 @@ class Blivet(object):
         self.services = set()
         self._free_space_snapshot = None
 
-    def to_xml(self, dump_device = None):
+    def to_xml(self, dump_device = None, custom_name = None):
         """
             This is the master to_xml() function. It basically gathers the data and
             performs parsing to XML notation on its children.
@@ -179,26 +179,37 @@ class Blivet(object):
 
         input_list = []
 
+        file_name = socket.gethostname().split(".")[0]
+
+        if custom_name != None:
+            file_name = custom_name
+
         if dump_device == None:
             input_list = self.devices
-            file_name = socket.gethostname().split(".")[0] + ".xml"
+            file_name = file_name + ".xml"
         else:
             for inc in self.devices:
                 if dump_device == inc.name:
                     input_list.append(inc)
-            file_name = socket.gethostname().split(".")[0] + "-" + dump_device + ".xml"
+            file_name = file_name + "-" + dump_device + ".xml"
 
         for inc in input_list:
             if hasattr(inc, "to_xml"):
-                list_of_elements.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id"))}))
+                list_of_elements.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
                 inc.to_xml(parent_elem = list_of_elements[-1], root_list = list_of_elements, root_elem = master_root_elem, format_list = list_of_formats)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
 
-    def from_xml(self, input_file):
+    def from_xml(self, **kwargs):
 
-        pass
+        try:
+            xml_file = kwargs.get("input_file")
+        except:
+            log.error("ERROR:\tNo XML file specified")
+
+        xml_root = ET.parse(xml_file).getroot()
+        return xml_root
 
     '''
     copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint

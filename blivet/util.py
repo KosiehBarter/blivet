@@ -689,7 +689,7 @@ class ObjectID(object):
 
                     xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)})) ## Adds a Child_ID Element to "link" to formats section
                     xml_sublist[-1].text = str(xml_parse_id)
-                    root_list.append(ET.SubElement(root_elem, str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id"))})) # Adds a format root elem.
+                    root_list.append(ET.SubElement(root_elem, str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
                     getattr(self, inc).to_xml(parent_elem = root_list[-1])
 
             else:
@@ -799,6 +799,9 @@ class ObjectID(object):
             else:
                 if level and (not elem.tail or not elem.tail.strip()):
                     elem.tail = i
+
+    def from_xml(self):
+        pass
 
 def canonicalize_UUID(a_uuid):
     """ Converts uuids to canonical form.
