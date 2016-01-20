@@ -228,7 +228,22 @@ class Blivet(object):
             log.error("ERROR:\tNo XML file specified")
 
         xml_root = ET.parse(xml_file).getroot()
-        return xml_root
+        for inc in xml_root:
+            for enc in inc:
+                if enc.tag == "fulltype":
+                    import_text = enc.text.split(".")
+                    impcommand = "from " + import_text[0] + "." + import_text[1] + "." + import_text[2] + " import " + import_text[3]
+                    command = inc.tag + "(\"%s\")" % inc.attrib.get("name")
+                    print (impcommand, command)
+
+
+                #try:
+                #    exec(impcommand)
+                #    command = inc.tag + "(\"%s\")" % inc.attrib.get("name")
+                #    self.devices.append(exec(command))
+                #except Exception as e:
+                #    print (e)
+
 
     '''
     copy and paste from http://effbot.org/zone/element-lib.htm#prettyprint

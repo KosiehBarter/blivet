@@ -663,10 +663,17 @@ class ObjectID(object):
         else:
             input_data = self.__dict__
 
+        ignored_attrs = ["sync", "id", "mount"]
+
+        xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
+        xml_sublist[-1].text = str(type(self)).split("'")[1]
         for inc in input_data:
             ## Basic fix - replace all underscore attrs with non-underscore
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
+
+            if inc in ignored_attrs:
+                continue
 
             if type(getattr(self, inc)) == list or str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
                 xml_sublist.append(ET.SubElement(parent_elem, "list"))
@@ -799,10 +806,6 @@ class ObjectID(object):
             else:
                 if level and (not elem.tail or not elem.tail.strip()):
                     elem.tail = i
-
-    def from_xml(self, **kwargs):
-        pass
-
 
 def canonicalize_UUID(a_uuid):
     """ Converts uuids to canonical form.
