@@ -182,8 +182,12 @@ class Blivet(object):
 
         # Declare master element and list of elems
         master_root_elem = ET.Element("Blivet-XML-Tools")
-        list_of_elements = []
-        list_of_formats = []
+
+        super_elems = []
+        disk_elems = []
+        format_elems = []
+
+        list_of_formats = [] # This helps in util.py to determine if to gather multiple formats or not
 
         input_list = []
 
@@ -212,10 +216,11 @@ class Blivet(object):
         ## Finally, add extension
         file_name = file_name + ".xml"
 
+        super_elems.append(ET.SubElement(master_root_elem, "Devices"))
         for inc in input_list:
             if hasattr(inc, "to_xml"):
-                list_of_elements.append(ET.SubElement(master_root_elem, str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
-                inc.to_xml(parent_elem = list_of_elements[-1], root_list = list_of_elements, root_elem = master_root_elem, format_list = list_of_formats)
+                disk_elems.append(ET.SubElement(super_elems[0], str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
+                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")

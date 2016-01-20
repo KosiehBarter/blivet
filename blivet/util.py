@@ -651,10 +651,14 @@ class ObjectID(object):
         """
         ## General
         full_dump = kwargs.get("full_dump")
+
         parent_elem = kwargs.get("parent_elem")
         root_elem = kwargs.get("root_elem")
-        root_list = kwargs.get("root_list")
+
         format_list = kwargs.get("format_list")
+        super_elems = kwargs.get("super_elems") # Not to be confused, this is a list of super elements!
+        format_elems = kwargs.get("format_elems")
+
         xml_sublist = []
         xml_child_sublist = []
 
@@ -694,10 +698,13 @@ class ObjectID(object):
                 if xml_parse_id not in format_list:
                     format_list.append(xml_parse_id) ## MANDATORY! Adds value of ID if does not exist for check.
 
+                    if len(super_elems) == 1:
+                        super_elems.append(ET.SubElement(root_elem, "Formats"))
+
                     xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)})) ## Adds a Child_ID Element to "link" to formats section
                     xml_sublist[-1].text = str(xml_parse_id)
-                    root_list.append(ET.SubElement(root_elem, str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
-                    getattr(self, inc).to_xml(parent_elem = root_list[-1])
+                    format_elems.append(ET.SubElement(super_elems[1], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
+                    getattr(self, inc).to_xml(parent_elem = format_elems[-1])
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
