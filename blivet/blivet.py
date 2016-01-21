@@ -216,6 +216,8 @@ class Blivet(object):
         ## Finally, add extension
         file_name = file_name + ".xml"
 
+        self._to_xml_sort(input_list)
+
         super_elems.append(ET.SubElement(master_root_elem, "Devices"))
         for inc in input_list:
             if hasattr(inc, "to_xml"):
@@ -224,6 +226,46 @@ class Blivet(object):
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
+
+    def _to_xml_sort(self, array_to_sort):
+
+        if len(array_to_sort) > 1:
+            middle_piv = len(array_to_sort) / 2
+
+            left_array = []
+            right_array = []
+
+            for inc in range(len(array_to_sort)):
+                if inc < middle_piv:
+                    left_array.append(array_to_sort[inc])
+                else:
+                    right_array.append(array_to_sort[inc])
+
+            self._to_xml_sort(left_array)
+            self._to_xml_sort(right_array)
+
+            iter_i = 0
+            iter_j = 0
+            iter_k = 0
+
+            while iter_i < len(left_array) and iter_j < len(right_array):
+                if left_array[iter_i].id < right_array[iter_j].id:
+                    array_to_sort[iter_k] = left_array[iter_i]
+                    iter_i = iter_i + 1
+                else:
+                    array_to_sort[iter_k] = right_array[iter_j]
+                    iter_j = iter_j + 1
+                iter_k = iter_k + 1
+
+            while iter_i < len(left_array):
+                array_to_sort[iter_k] = left_array[iter_i]
+                iter_i = iter_i + 1
+                iter_k = iter_k + 1
+
+            while iter_j < len(right_array):
+                array_to_sort[iter_k] = right_array[iter_j]
+                iter_j = iter_j + 1
+                iter_k = iter_k + 1
 
     def from_xml(self, **kwargs):
 
