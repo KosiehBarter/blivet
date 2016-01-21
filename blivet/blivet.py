@@ -188,6 +188,7 @@ class Blivet(object):
         format_elems = []
 
         list_of_formats = [] # This helps in util.py to determine if to gather multiple formats or not
+        list_of_devices = [] # Same function as list_of_formats
 
         input_list = []
 
@@ -222,7 +223,7 @@ class Blivet(object):
         for inc in input_list:
             if hasattr(inc, "to_xml"):
                 disk_elems.append(ET.SubElement(super_elems[0], str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
-                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats)
+                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats, device_ids = list_of_devices)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
@@ -283,7 +284,8 @@ class Blivet(object):
                     command = inc.tag + "(\"%s\")" % inc.attrib.get("name")
                     print (impcommand, command)
 
-
+                    """ NEPOUZIVAT EVAL A EXEC
+                        import lib, pozor na dokumentaci"""
                 #try:
                 #    exec(impcommand)
                 #    command = inc.tag + "(\"%s\")" % inc.attrib.get("name")

@@ -656,6 +656,8 @@ class ObjectID(object):
         root_elem = kwargs.get("root_elem")
 
         format_list = kwargs.get("format_list")
+        device_ids = kwargs.get("device_ids")
+
         super_elems = kwargs.get("super_elems") # Not to be confused, this is a list of super elements!
         format_elems = kwargs.get("format_elems")
 
@@ -665,9 +667,9 @@ class ObjectID(object):
         if full_dump != None and hasattr(self, "_to_xml_set_attrs"):
             input_data = self._to_xml_set_attrs()
         else:
-            input_data = self.__dict__
+            input_data = dir(self)
 
-        ignored_attrs = ["sync", "id", "mount"]
+        ignored_attrs = ["sync", "dict", "mount"]
 
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sublist[-1].text = str(type(self)).split("'")[1]
@@ -676,8 +678,11 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs:
+            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or str(type(getattr(self, inc))).split("\'")[1] == "method":
                 continue
+
+            if inc == "id":
+                device_ids.append(getattr(self, inc))
 
             if type(getattr(self, inc)) == list or str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
                 xml_sublist.append(ET.SubElement(parent_elem, "list"))
@@ -695,7 +700,7 @@ class ObjectID(object):
             elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
                 xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
-                if xml_parse_id not in format_list:
+                if xml_parse_id not in format_list and xml_parse_id not in device_ids:
                     format_list.append(xml_parse_id) ## MANDATORY! Adds value of ID if does not exist for check.
 
                     if len(super_elems) == 1:
@@ -704,7 +709,7 @@ class ObjectID(object):
                     xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)})) ## Adds a Child_ID Element to "link" to formats section
                     xml_sublist[-1].text = str(xml_parse_id)
                     format_elems.append(ET.SubElement(super_elems[1], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
-                    getattr(self, inc).to_xml(parent_elem = format_elems[-1])
+                    getattr(self, inc).to_xml(parent_elem = format_elems[-1], format_list = format_list, device_ids = device_ids)
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
