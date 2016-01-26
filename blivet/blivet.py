@@ -279,10 +279,15 @@ class Blivet(object):
         ## Get root and devices + formats elements
         xml_devices = ET.parse(xml_file).getroot()[0]
         xml_formats = ET.parse(xml_file).getroot()[1]
+        parsed_list = []
 
         for inc in xml_devices:
-            imp_str = self._from_xml_parse_name(inc[0]) ## parse name
-            self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
+            #imp_str = self._from_xml_parse_name(inc[0]) ## parse name
+            #parsed_list.append(getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]))
+            #self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
+            pass
+
+        return parsed_list
 
     def _from_xml_parse_name(self, in_inc):
         """
@@ -315,6 +320,9 @@ class Blivet(object):
             in_list.append(e)
 
     def _from_xml_get_parent(self, par_id_list):
+        """
+            Docstring
+        """
         par_list = []
         for inc in self.devices:
             if inc.id in par_id_list:
