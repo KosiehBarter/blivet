@@ -29,6 +29,7 @@ import parted
 import functools
 import xml.etree.ElementTree as ET
 import socket
+import importlib
 
 
 from pykickstart.constants import AUTOPART_TYPE_LVM, CLEARPART_TYPE_ALL, CLEARPART_TYPE_LINUX, CLEARPART_TYPE_LIST, CLEARPART_TYPE_NONE
@@ -275,23 +276,74 @@ class Blivet(object):
         except:
             log.error("ERROR:\tNo XML file specified")
 
-        xml_root = ET.parse(xml_file).getroot()
-        for inc in xml_root:
-            for enc in inc:
-                if enc.tag == "fulltype":
-                    import_text = enc.text.split(".")
-                    impcommand = "from " + import_text[0] + "." + import_text[1] + "." + import_text[2] + " import " + import_text[3]
-                    command = inc.tag + "(\"%s\")" % inc.attrib.get("name")
-                    print (impcommand, command)
+        ## Get root and devices + formats elements
+        xml_devices = ET.parse(xml_file).getroot()[0]
+        xml_formats = ET.parse(xml_file).getroot()[1]
 
-                    """ NEPOUZIVAT EVAL A EXEC
-                        import lib, pozor na dokumentaci"""
-                #try:
-                #    exec(impcommand)
-                #    command = inc.tag + "(\"%s\")" % inc.attrib.get("name")
-                #    self.devices.append(exec(command))
-                #except Exception as e:
-                #    print (e)
+        for inc in xml_devices:
+            imp_str = self._from_xml_parse_name(inc[0]) ## parse name
+            self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
+
+    def _from_xml_parse_name(self, in_inc):
+        """
+            This function basically parses a name from fulltype element or any
+            other input element.
+        """
+        imp_str = ""
+        for enc in range(len(in_inc.text.split(".")) - 1):
+            imp_str = imp_str + "." + in_inc.text.split(".")[enc]
+        return imp_str[1:]
+
+
+    def _from_xml_init_class(self, in_list, in_obj, in_elem):
+        """
+            Gathers basic data required for class initialization.
+
+            :param list in_list: a input list to append to.
+            :param
+        """
+        parents = []
+        for inc in in_elem:
+            ## Look for parents
+            if inc.attrib.get("attr") == "parents":
+                parents = self._from_xml_parse_list(inc, par_bool = True)
+
+        try:
+            in_list.append(in_obj(name = in_elem.attrib.get("name"), parents = parents, exists = False))
+            in_list[-1].id = int(in_elem.attrib.get("id"))
+        except Exception as e:
+            in_list.append(e)
+
+    def _from_xml_get_parent(self, par_id_list):
+        par_list = []
+        for inc in self.devices:
+            if inc.id in par_id_list:
+                par_list.append(inc)
+        return par_list
+
+
+    def _from_xml_set_attrs(self, in_obj):
+        """
+            Docstring
+        """
+        for inc in in_elem:
+            ## If its list?
+            if inc.tag == "list":
+                setattr(obj, inc.attrib.get("attr"), self._from_xml_parse_list(inc))
+
+    def _from_xml_parse_list(self, in_elem, par_bool = False):
+        """
+            This function parses XML list into standard Python list.
+        """
+        in_list = []
+        for inc in in_elem:
+            in_list.append(inc.text)
+
+        if par_bool == True:
+            return self._from_xml_get_parent(in_list)
+        else:
+            return in_list
+
 
 
     '''

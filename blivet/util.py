@@ -661,6 +661,8 @@ class ObjectID(object):
         super_elems = kwargs.get("super_elems") # Not to be confused, this is a list of super elements!
         format_elems = kwargs.get("format_elems")
 
+        elems_done = []
+
         xml_sublist = []
         xml_child_sublist = []
 
@@ -678,11 +680,12 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or str(type(getattr(self, inc))).split("\'")[1] == "method":
+            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or str(type(getattr(self, inc))).split("\'")[1] == "method" or inc in elems_done:
                 continue
 
             if inc == "id":
                 device_ids.append(getattr(self, inc))
+                continue
 
             if type(getattr(self, inc)) == list or str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
                 xml_sublist.append(ET.SubElement(parent_elem, "list"))
@@ -718,6 +721,7 @@ class ObjectID(object):
                 else:
                     integer_override = False
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc, full_bool = True, integer_override = integer_override)
+            elems_done.append(inc)
 
         self._to_xml_indent(parent_elem)
 
@@ -727,13 +731,9 @@ class ObjectID(object):
         """
         xml_sublist_items = []
 
-        if input_list == []:
+        for inc in input_list:
             xml_sublist_items.append(ET.SubElement(parent_index, "item"))
-            xml_sublist_items[-1].text = str(None)
-        else:
-            for inc in input_list:
-                xml_sublist_items.append(ET.SubElement(parent_index, "item"))
-                self._to_xml_set_data(elem = xml_sublist_items[-1], tag = inc, input_type = "list")
+            self._to_xml_set_data(elem = xml_sublist_items[-1], tag = inc, input_type = "list")
 
 
     def _to_xml_set_data(self, **kwargs):
