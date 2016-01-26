@@ -282,75 +282,81 @@ class Blivet(object):
         parsed_list = []
 
         for inc in xml_devices:
-            #imp_str = self._from_xml_parse_name(inc[0]) ## parse name
-            #parsed_list.append(getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]))
+            imp_str = self._from_xml_parse_name(inc[0]) ## parse name
+            obj = getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]) ## get object
+            parsed_list.append(self._from_xml_init_class(obj, inc))
+
             #self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
-            pass
 
         return parsed_list
 
-    def _from_xml_parse_name(self, in_inc):
+    def _from_xml_parse_name(self, in_elem):
         """
             This function basically parses a name from fulltype element or any
             other input element.
+
+            param ET.Element in_elem: Input element to parse from its text
         """
         imp_str = ""
-        for enc in range(len(in_inc.text.split(".")) - 1):
-            imp_str = imp_str + "." + in_inc.text.split(".")[enc]
+        for enc in range(len(in_elem.text.split(".")) - 1):
+            imp_str = imp_str + "." + in_elem.text.split(".")[enc]
         return imp_str[1:]
 
 
-    def _from_xml_init_class(self, in_list, in_obj, in_elem):
+    def _from_xml_init_class(self, in_obj, in_elem):
         """
             Gathers basic data required for class initialization.
 
             :param list in_list: a input list to append to.
             :param
         """
-        parents = []
-        for inc in in_elem:
-            ## Look for parents
-            if inc.attrib.get("attr") == "parents":
-                parents = self._from_xml_parse_list(inc, par_bool = True)
+        parent_id = []
+
 
         try:
-            in_list.append(in_obj(name = in_elem.attrib.get("name"), parents = parents, exists = False))
-            in_list[-1].id = int(in_elem.attrib.get("id"))
-        except Exception as e:
-            in_list.append(e)
+            obj_attr_name = in_elem.attrib.get("name")
+            temp_obj = in_obj(obj_attr_name)
+            temp_obj.id = int(in_elem.attrib.get("id"))
+            try:
+                self._from_xml_set_attrs(temp_obj, in_elem)
+            except Exception as e_set:
+                print (e_set)
+        except Exception as e_crt:
+            temp_obj = e_crt
+        return temp_obj
+
 
     def _from_xml_get_parent(self, par_id_list):
         """
             Docstring
         """
-        par_list = []
         for inc in self.devices:
             if inc.id in par_id_list:
                 par_list.append(inc)
         return par_list
 
 
-    def _from_xml_set_attrs(self, in_obj):
+    def _from_xml_set_attrs(self, in_obj, in_elem):
         """
             Docstring
         """
-        for inc in in_elem:
-            ## If its list?
-            if inc.tag == "list":
-                setattr(obj, inc.attrib.get("attr"), self._from_xml_parse_list(inc))
+        type_dict = {"str": str, "bool": bool, "int": int}
 
-    def _from_xml_parse_list(self, in_elem, par_bool = False):
+        for inc in in_elem:
+            if inc.tag == "list":
+                print (inc.text)
+                setattr(in_obj, inc.attrib.get("attr"), self._from_xml_parse_list)
+
+
+    def _from_xml_parse_list(self, in_elem):
         """
             This function parses XML list into standard Python list.
         """
         in_list = []
         for inc in in_elem:
+            print (inc.text)
             in_list.append(inc.text)
-
-        if par_bool == True:
-            return self._from_xml_get_parent(in_list)
-        else:
-            return in_list
+        return in_list
 
 
 

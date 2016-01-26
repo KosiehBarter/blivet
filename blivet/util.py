@@ -671,7 +671,7 @@ class ObjectID(object):
         else:
             input_data = dir(self)
 
-        ignored_attrs = ["sync", "dict", "mount", "parted_partition"]
+        ignored_attrs = ["sync", "dict", "mount", "parted_partition", "name"]
 
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sublist[-1].text = str(type(self)).split("'")[1]
