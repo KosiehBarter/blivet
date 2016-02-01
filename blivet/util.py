@@ -779,7 +779,7 @@ class ObjectID(object):
         if input_type == "list":
             if hasattr(tag, "id"):
                 elem.text = str(getattr(tag, "id"))
-                elem.set("attr", "parent_id")
+                elem.set("attr", "id")
             else:
                 elem.text = str(tag)
             elem.set("type", str(type(tag)).split("'")[1])

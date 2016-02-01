@@ -26,6 +26,7 @@ import shutil
 import pprint
 import copy
 import parted
+import xml.etree.ElementTree as ET
 
 import gi
 gi.require_version("BlockDev", "1.0")
@@ -1707,3 +1708,23 @@ class Populator(object):
 
     def get_device_by_uuid(self, *args, **kwargs):
         return self.devicetree.get_device_by_uuid(*args, **kwargs)
+
+class PopulatorXML(object):
+    """docstring for PopulatorXML"""
+    def __init__(self, xml_file):
+        super(PopulatorXML, self).__init__()
+
+        ## Define XML file and load its root
+        self._xml_file = xml_file
+        self.xml_root = self._import_xml()
+
+    ## This method gets XML file and laods it
+    def _import_xml(self):
+        try:
+            xml_root = ET.parse(self._xml_file).getroot()
+            return [xml_root[0], xml_root[1]]
+        except Exception as e:
+            log.error("Failed to load XML file")
+
+    def populate(self, cleanup_only = False):
+        pass

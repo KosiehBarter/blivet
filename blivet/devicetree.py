@@ -39,7 +39,7 @@ from . import udev
 from . import util
 from .util import open  # pylint: disable=redefined-builtin
 from .flags import flags
-from .populator import Populator
+from .populator import Populator, PopulatorXML
 from .storage_log import log_method_call, log_method_return
 
 import logging
@@ -70,7 +70,7 @@ class DeviceTree(object):
     """
 
     def __init__(self, conf=None, passphrase=None, luks_dict=None,
-                 iscsi=None, dasd=None):
+                 iscsi=None, dasd=None, xml_file=None):
         """
 
             :keyword conf: storage discovery configuration
@@ -87,7 +87,7 @@ class DeviceTree(object):
         self.reset(conf, passphrase, luks_dict, iscsi, dasd)
 
     def reset(self, conf=None, passphrase=None, luks_dict=None,
-              iscsi=None, dasd=None):
+              iscsi=None, dasd=None, xml_file = None):
         """ Reset the instance to its initial state. """
         # internal data members
         self._devices = []
@@ -106,12 +106,15 @@ class DeviceTree(object):
 
         self.edd_dict = {}
 
-        self._populator = Populator(self,
-                                    conf=conf,
-                                    passphrase=passphrase,
-                                    luks_dict=luks_dict,
-                                    iscsi=iscsi,
-                                    dasd=dasd)
+        if xml_file == None:
+            self._populator = Populator(self,
+                                        conf=conf,
+                                        passphrase=passphrase,
+                                        luks_dict=luks_dict,
+                                        iscsi=iscsi,
+                                        dasd=dasd)
+        else:
+            self._populator = PopulatorXML(xml_file)
 
     def __str__(self):
         done = []
