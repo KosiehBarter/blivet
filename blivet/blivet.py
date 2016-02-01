@@ -289,16 +289,27 @@ class Blivet(object):
         self.xml_formats = ET.parse(xml_file).getroot()[1]
         parsed_list = []
 
+<<<<<<< HEAD
         for inc in self.xml_devices:
             imp_str = self._from_xml_parse_name(inc[0]) ## parse name
             obj = getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]) ## get object
             parsed_list.append(self._from_xml_init_class(obj, inc, parsed_list))
+=======
+        for inc in xml_devices:
+            imp_str = self._from_xml_parse_name(inc[0]) ## parse name
+            obj = getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]) ## get object
+            parsed_list.append(self._from_xml_init_class(obj, inc))
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
 
             #self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
 
         return parsed_list
 
+<<<<<<< HEAD
     def _from_xml_parse_name(self, in_elem, in_str = False):
+=======
+    def _from_xml_parse_name(self, in_elem):
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
         """
             This function basically parses a name from fulltype element or any
             other input element.
@@ -306,6 +317,7 @@ class Blivet(object):
             param ET.Element in_elem: Input element to parse from its text
         """
         imp_str = ""
+<<<<<<< HEAD
         if in_str == False:
             parsed_obj = in_elem.text
         else:
@@ -318,12 +330,21 @@ class Blivet(object):
 
 
     def _from_xml_init_class(self, in_obj, in_elem, parsed_list):
+=======
+        for enc in range(len(in_elem.text.split(".")) - 1):
+            imp_str = imp_str + "." + in_elem.text.split(".")[enc]
+        return imp_str[1:]
+
+
+    def _from_xml_init_class(self, in_obj, in_elem):
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
         """
             Gathers basic data required for class initialization.
 
             :param list in_list: a input list to append to.
             :param
         """
+<<<<<<< HEAD
         parents = self._from_xml_get_parent(in_elem, parsed_list)
         obj_name = in_elem.attrib.get("name")
         #obj_path =
@@ -333,15 +354,39 @@ class Blivet(object):
         in_obj.format = self._from_xml_get_format(in_elem)
         return in_obj
 
+=======
+        parent_id = []
+
+
+        try:
+            obj_attr_name = in_elem.attrib.get("name")
+            temp_obj = in_obj(obj_attr_name)
+            temp_obj.id = int(in_elem.attrib.get("id"))
+            try:
+                self._from_xml_set_attrs(temp_obj, in_elem)
+            except Exception as e_set:
+                print (e_set)
+        except Exception as e_crt:
+            temp_obj = e_crt
+        return temp_obj
+
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
 
     def _from_xml_get_parent(self, in_elem, parsed_list):
         """
             Docstring
         """
+<<<<<<< HEAD
         parent_id = []
         for inc in in_elem:
             if inc.attrib.get("attr") == "parents":
                 parent_id = self._from_xml_parse_list(inc, par_bool = True)
+=======
+        for inc in self.devices:
+            if inc.id in par_id_list:
+                par_list.append(inc)
+        return par_list
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
 
         ## Now, scan for parent object
         parent_obj = []
@@ -350,6 +395,7 @@ class Blivet(object):
                 parent_obj.append(inc)
         return parent_obj
 
+<<<<<<< HEAD
     def _from_xml_get_format(self, in_elem):
         for inc in in_elem:
             if inc.tag == "Child_ID":
@@ -361,13 +407,27 @@ class Blivet(object):
                 format_name = self._from_xml_parse_name(inc[0])
                 temp_obj = getattr(importlib.import_module(format_name), inc[0].text.split(".")[-1])
                 return temp_obj(name = inc.attrib.get("name"))
+=======
+    def _from_xml_set_attrs(self, in_obj, in_elem):
+        """
+            Docstring
+        """
+        type_dict = {"str": str, "bool": bool, "int": int}
 
-    def _from_xml_parse_list(self, in_elem, par_bool = False):
+        for inc in in_elem:
+            if inc.tag == "list":
+                print (inc.text)
+                setattr(in_obj, inc.attrib.get("attr"), self._from_xml_parse_list)
+
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
+
+    def _from_xml_parse_list(self, in_elem):
         """
             This function parses XML list into standard Python list.
         """
         in_list = []
         for inc in in_elem:
+<<<<<<< HEAD
             if par_bool == True:
                 in_list.append(int(inc.text))
             else:
@@ -381,6 +441,11 @@ class Blivet(object):
         ignored_tags = ["fulltype", "list"]
         ignored_atts = ["kids", "name", "parents", "format", "external_dependencies", "unavailable_dependencies"]
         type_dict = {"str": str, "bool": bool, "int": int, }
+=======
+            print (inc.text)
+            in_list.append(inc.text)
+        return in_list
+>>>>>>> b7aa8a4fb887e6110b1011f0d6fc5c00cde2a40d
 
         for inc in in_elem:
             if inc.attrib.get("attr") not in ignored_atts and inc.tag not in ignored_tags:
