@@ -187,9 +187,11 @@ class Blivet(object):
         super_elems = []
         disk_elems = []
         format_elems = []
+        parted_elems = []
 
         list_of_formats = [] # This helps in util.py to determine if to gather multiple formats or not
         list_of_devices = [] # Same function as list_of_formats
+        list_of_parted = [] # Same as above
 
         input_list = []
 
@@ -221,10 +223,13 @@ class Blivet(object):
         self._to_xml_sort(input_list)
 
         super_elems.append(ET.SubElement(master_root_elem, "Devices"))
+        super_elems.append(ET.SubElement(master_root_elem, "Formats"))
+        super_elems.append(ET.SubElement(master_root_elem, "Parted_Objects"))
+
         for inc in input_list:
             if hasattr(inc, "to_xml"):
                 disk_elems.append(ET.SubElement(super_elems[0], str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
-                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats, device_ids = list_of_devices)
+                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats, device_ids = list_of_devices, parted_elems = parted_elems, parted_list = list_of_parted)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
@@ -271,26 +276,29 @@ class Blivet(object):
 
     def from_xml(self, **kwargs):
 
+        ## Poznamka: blivet.devicetree.devices - tam ulozit nove objekty
+        ## Full dump nebo partial dump?
+
         try:
             xml_file = kwargs.get("input_file")
         except:
             log.error("ERROR:\tNo XML file specified")
 
         ## Get root and devices + formats elements
-        xml_devices = ET.parse(xml_file).getroot()[0]
-        xml_formats = ET.parse(xml_file).getroot()[1]
+        self.xml_devices = ET.parse(xml_file).getroot()[0]
+        self.xml_formats = ET.parse(xml_file).getroot()[1]
         parsed_list = []
 
-        for inc in xml_devices:
+        for inc in self.xml_devices:
             imp_str = self._from_xml_parse_name(inc[0]) ## parse name
             obj = getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]) ## get object
-            parsed_list.append(self._from_xml_init_class(obj, inc))
+            parsed_list.append(self._from_xml_init_class(obj, inc, parsed_list))
 
             #self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
 
         return parsed_list
 
-    def _from_xml_parse_name(self, in_elem):
+    def _from_xml_parse_name(self, in_elem, in_str = False):
         """
             This function basically parses a name from fulltype element or any
             other input element.
@@ -298,66 +306,97 @@ class Blivet(object):
             param ET.Element in_elem: Input element to parse from its text
         """
         imp_str = ""
-        for enc in range(len(in_elem.text.split(".")) - 1):
-            imp_str = imp_str + "." + in_elem.text.split(".")[enc]
+        if in_str == False:
+            parsed_obj = in_elem.text
+        else:
+            parsed_obj = in_elem
+
+        ## Do a scan
+        for enc in range(len(parsed_obj.split(".")) - 1):
+            imp_str = imp_str + "." + parsed_obj.split(".")[enc]
         return imp_str[1:]
 
 
-    def _from_xml_init_class(self, in_obj, in_elem):
+    def _from_xml_init_class(self, in_obj, in_elem, parsed_list):
         """
             Gathers basic data required for class initialization.
 
             :param list in_list: a input list to append to.
             :param
         """
+        parents = self._from_xml_get_parent(in_elem, parsed_list)
+        obj_name = in_elem.attrib.get("name")
+        #obj_path =
+        in_obj = in_obj(obj_name, parents = parents, exists = True)
+        in_obj.id = int(in_elem.attrib.get("id"))
+        self._from_xml_set_attrs(in_obj, in_elem)
+        in_obj.format = self._from_xml_get_format(in_elem)
+        return in_obj
+
+
+    def _from_xml_get_parent(self, in_elem, parsed_list):
+        """
+            Docstring
+        """
         parent_id = []
-
-
-        try:
-            obj_attr_name = in_elem.attrib.get("name")
-            temp_obj = in_obj(obj_attr_name)
-            temp_obj.id = int(in_elem.attrib.get("id"))
-            try:
-                self._from_xml_set_attrs(temp_obj, in_elem)
-            except Exception as e_set:
-                print (e_set)
-        except Exception as e_crt:
-            temp_obj = e_crt
-        return temp_obj
-
-
-    def _from_xml_get_parent(self, par_id_list):
-        """
-            Docstring
-        """
-        for inc in self.devices:
-            if inc.id in par_id_list:
-                par_list.append(inc)
-        return par_list
-
-
-    def _from_xml_set_attrs(self, in_obj, in_elem):
-        """
-            Docstring
-        """
-        type_dict = {"str": str, "bool": bool, "int": int}
-
         for inc in in_elem:
-            if inc.tag == "list":
-                print (inc.text)
-                setattr(in_obj, inc.attrib.get("attr"), self._from_xml_parse_list)
+            if inc.attrib.get("attr") == "parents":
+                parent_id = self._from_xml_parse_list(inc, par_bool = True)
 
+        ## Now, scan for parent object
+        parent_obj = []
+        for inc in parsed_list:
+            if inc.id in parent_id:
+                parent_obj.append(inc)
+        return parent_obj
 
-    def _from_xml_parse_list(self, in_elem):
+    def _from_xml_get_format(self, in_elem):
+        for inc in in_elem:
+            if inc.tag == "Child_ID":
+                format_id = int(inc.text)
+
+        ## Get format
+        for inc in self.xml_formats:
+            if int(inc.attrib.get("id")) == format_id:
+                format_name = self._from_xml_parse_name(inc[0])
+                temp_obj = getattr(importlib.import_module(format_name), inc[0].text.split(".")[-1])
+                return temp_obj(name = inc.attrib.get("name"))
+
+    def _from_xml_parse_list(self, in_elem, par_bool = False):
         """
             This function parses XML list into standard Python list.
         """
         in_list = []
         for inc in in_elem:
-            print (inc.text)
-            in_list.append(inc.text)
+            if par_bool == True:
+                in_list.append(int(inc.text))
+            else:
+                in_list.append(inc.text)
         return in_list
 
+    def _from_xml_set_attrs(self, in_obj, in_elem):
+        """
+            :param ET.Element in_elem
+        """
+        ignored_tags = ["fulltype", "list"]
+        ignored_atts = ["kids", "name", "parents", "format", "external_dependencies", "unavailable_dependencies"]
+        type_dict = {"str": str, "bool": bool, "int": int, }
+
+        for inc in in_elem:
+            if inc.attrib.get("attr") not in ignored_atts and inc.tag not in ignored_tags:
+                attr_type = inc.attrib.get("type")
+                if attr_type == "NoneType":
+                    #setattr(in_obj, inc.attrib.get("attr"), None)
+                    continue
+                elif attr_type not in type_dict:
+                    imp_str = self._from_xml_parse_name(inc.attrib.get("type"), True)
+                    attr_type = getattr(importlib.import_module(imp_str), inc.attrib.get("type").split(".")[-1])
+                else:
+                    attr_type = type_dict.get(inc.attrib.get("type"))
+                try:
+                    setattr(in_obj, inc.attrib.get("attr"), attr_type(inc.text))
+                except Exception as e:
+                    print (e)
 
 
     '''

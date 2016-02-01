@@ -656,10 +656,12 @@ class ObjectID(object):
         root_elem = kwargs.get("root_elem")
 
         format_list = kwargs.get("format_list")
+        parted_list = kwargs.get("parted_list")
         device_ids = kwargs.get("device_ids")
 
         super_elems = kwargs.get("super_elems") # Not to be confused, this is a list of super elements!
         format_elems = kwargs.get("format_elems")
+        parted_elems = kwargs.get("parted_elems")
 
         elems_done = []
 
@@ -680,18 +682,18 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or str(type(getattr(self, inc))).split("\'")[1] == "method" or inc in elems_done:
+            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done:
                 continue
 
             if inc == "id":
                 device_ids.append(getattr(self, inc))
                 continue
 
-            if type(getattr(self, inc)) == list or str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
+            if type(getattr(self, inc)) == list or "ParentList" in str(type(getattr(self, inc))):
                 xml_sublist.append(ET.SubElement(parent_elem, "list"))
 
                 ## Determine if ParentList or just pure list.
-                if str(type(getattr(self, inc))).split("'")[1].split(".")[-1] == "ParentList":
+                if "ParentList" in str(type(getattr(self, inc))): #.split("'")[1].split(".")[-1] == "ParentList":
                     xml_list_parse = self._getdeepattr(self, str(inc) + ".items")
                 else:
                     xml_list_parse = getattr(self, inc)
@@ -700,19 +702,24 @@ class ObjectID(object):
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc)
                 self._to_xml_parse_list(xml_list_parse, xml_sublist[-1])
 
-            elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
+            if hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
                 xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
                 if xml_parse_id not in format_list and xml_parse_id not in device_ids:
                     format_list.append(xml_parse_id) ## MANDATORY! Adds value of ID if does not exist for check.
 
-                    if len(super_elems) == 1:
-                        super_elems.append(ET.SubElement(root_elem, "Formats"))
-
                     xml_sublist.append(ET.SubElement(parent_elem, "Child_ID", {"attr": str(inc)})) ## Adds a Child_ID Element to "link" to formats section
                     xml_sublist[-1].text = str(xml_parse_id)
                     format_elems.append(ET.SubElement(super_elems[1], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
-                    getattr(self, inc).to_xml(parent_elem = format_elems[-1], format_list = format_list, device_ids = device_ids)
+                    getattr(self, inc).to_xml(parent_elem = format_elems[-1], format_list = format_list, device_ids = device_ids, parted_elems = parted_elems, super_elems = super_elems, parted_list = parted_list)
+
+            if "parted." in str(type(getattr(self, inc))) and (str(type(getattr(self, inc))).split("'")[1], format_list[-1]) not in parted_list:
+                parted_list.append((str(type(getattr(self, inc))).split("'")[1], format_list[-1]))
+                parted_elems.append(ET.SubElement(super_elems[2], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"format_id": str(format_list[-1])}))
+                self._to_xml_parse_parted(parted_elems[-1], format_list[-1], getattr(self, inc))
+
+            elif "parted." in str(type(getattr(self, inc))):
+                continue
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
@@ -724,6 +731,26 @@ class ObjectID(object):
             elems_done.append(inc)
 
         self._to_xml_indent(parent_elem)
+
+    def _to_xml_parse_parted(self, parent_elem, in_id, in_obj):
+        xml_sub_parted_list = []
+        xml_sub_parted_list.append(ET.SubElement(parent_elem, "fullname"))
+        xml_sub_parted_list[-1].text = str(type(in_obj)).split("'")[1]
+
+        allowed_attrs = ["type", "lastPartitionNumber", "maxPartitionLength", "maxPartitionStartSector", "maxPrimaryPartitionCount", "maxSupportedPartitionCount", "primaryPartitionCount",
+                         "biosGeometry", "bootDirty", "busy", "did", "dirty", "externalMode", "hardwareGeometry", "host", "length", "model", "openCount", "path", "physicalSectorSize",
+                         "readOnly", "sectorSize", "grainSize", "offset", "fileSystem", "active", "name", "number", "_abc_negative_cache_version",
+                         "invalid"]
+
+        for inc in allowed_attrs:
+            try:
+                if getattr(in_obj, inc) != None:
+                    xml_sub_parted_list.append(ET.SubElement(parent_elem, "prop"))
+                    xml_sub_parted_list[-1].text = str(getattr(in_obj, inc))
+                    xml_sub_parted_list[-1].set("attr", str(inc))
+            except:
+                continue
+
 
     def _to_xml_parse_list(self, input_list, parent_index):
         """
