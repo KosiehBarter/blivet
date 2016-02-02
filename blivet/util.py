@@ -673,7 +673,7 @@ class ObjectID(object):
         else:
             input_data = dir(self)
 
-        ignored_attrs = ["sync", "dict", "mount", "parted_partition", "name"]
+        ignored_attrs = ["sync", "dict", "mount", "parted_partition", "name", "_newid_gen", "_levels", "_newid_func"]
 
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sublist[-1].text = str(type(self)).split("'")[1]
@@ -682,7 +682,7 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done:
+            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done or "dependencies" in inc:
                 continue
 
             elif inc == "id":

@@ -77,7 +77,7 @@ def parted_exn_handler(exn_type, exn_options, exn_msg):
 class Populator(object):
 
     def __init__(self, devicetree=None, conf=None, passphrase=None,
-                 luks_dict=None, iscsi=None, dasd=None):
+                 luks_dict=None, iscsi=None, dasd=None, xml_file=None):
         """
             :keyword conf: storage discovery configuration
             :type conf: :class:`~.StorageDiscoveryConfig`
@@ -1612,7 +1612,7 @@ class Populator(object):
             self.__luks_devs[device.format.uuid] = passphrase
             self.__passphrases.append(passphrase)
 
-    def populate(self, cleanup_only=False):
+    def populate(self, cleanup_only=False, xml_file = None):
         """ Locate all storage devices.
 
             Everything should already be active. We just go through and gather
@@ -1628,12 +1628,36 @@ class Populator(object):
 
         parted.register_exn_handler(parted_exn_handler)
         try:
-            self._populate()
+            if xml_file == None:
+                self._populate()
+            else:
+                self._populate_xml(xml_file)
         except Exception:
             raise
         finally:
             parted.clear_exn_handler()
             self.restore_configs()
+
+    def _populate_xml(self, xml_file):
+        xml_root = self._from_xml_get_root(xml_file)
+
+        device_list = self._from_xml_iterate_master(xml_root[0])
+        format_list = self._from_xml_iterate_master(xml_root[1])
+
+        type_dict = {"str": str, "bool": bool, "int": int}
+
+
+    def _from_xml_iterate_master(self, in_elem):
+        # First, create format dict.
+        in_dict = []
+        for inc in in_elem:
+            in_dict.append(inc.tag)
+        return in_dict
+
+    def _from_xml_get_root(self, in_file):
+        xml_root = ET.parse(in_file).getroot()
+        return [xml_root[0], xml_root[1]]
+
 
     def _populate(self):
         log.info("DeviceTree.populate: ignored_disks is %s ; exclusive_disks is %s",
@@ -1708,23 +1732,3 @@ class Populator(object):
 
     def get_device_by_uuid(self, *args, **kwargs):
         return self.devicetree.get_device_by_uuid(*args, **kwargs)
-
-class PopulatorXML(object):
-    """docstring for PopulatorXML"""
-    def __init__(self, xml_file):
-        super(PopulatorXML, self).__init__()
-
-        ## Define XML file and load its root
-        self._xml_file = xml_file
-        self.xml_root = self._import_xml()
-
-    ## This method gets XML file and laods it
-    def _import_xml(self):
-        try:
-            xml_root = ET.parse(self._xml_file).getroot()
-            return [xml_root[0], xml_root[1]]
-        except Exception as e:
-            log.error("Failed to load XML file")
-
-    def populate(self, cleanup_only = False):
-        pass

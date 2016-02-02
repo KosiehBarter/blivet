@@ -39,7 +39,7 @@ from . import udev
 from . import util
 from .util import open  # pylint: disable=redefined-builtin
 from .flags import flags
-from .populator import Populator, PopulatorXML
+from .populator import Populator
 from .storage_log import log_method_call, log_method_return
 
 import logging
@@ -106,15 +106,13 @@ class DeviceTree(object):
 
         self.edd_dict = {}
 
-        if xml_file == None:
-            self._populator = Populator(self,
-                                        conf=conf,
-                                        passphrase=passphrase,
-                                        luks_dict=luks_dict,
-                                        iscsi=iscsi,
-                                        dasd=dasd)
-        else:
-            self._populator = PopulatorXML(xml_file)
+        self._populator = Populator(self,
+                                    conf=conf,
+                                    passphrase=passphrase,
+                                    luks_dict=luks_dict,
+                                    iscsi=iscsi,
+                                    dasd=dasd,
+                                    xml_file=xml_file)
 
     def __str__(self):
         done = []
@@ -331,7 +329,7 @@ class DeviceTree(object):
     #
     # Device detection
     #
-    def populate(self, cleanup_only=False):
+    def populate(self, cleanup_only=False, xml_file=None):
         """ Locate all storage devices.
 
             Everything should already be active. We just go through and gather
@@ -344,7 +342,7 @@ class DeviceTree(object):
         udev.settle()
         self.drop_lvm_cache()
         try:
-            self._populator.populate(cleanup_only=cleanup_only)
+            self._populator.populate(cleanup_only=cleanup_only, xml_file=xml_file)
         except Exception:
             raise
         finally:

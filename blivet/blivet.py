@@ -473,7 +473,7 @@ class Blivet(object):
                               iscsi=self.iscsi,
                               dasd=self.dasd,
                               xml_file=self.xml_file)
-        self.devicetree.populate(cleanup_only=cleanup_only)
+        self.devicetree.populate(cleanup_only=cleanup_only, xml_file=self.xml_file)
         self.fsset = FSSet(self.devicetree)
         self.edd_dict = get_edd_dict(self.partitioned)
         self.devicetree.edd_dict = self.edd_dict
