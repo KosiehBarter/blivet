@@ -685,11 +685,11 @@ class ObjectID(object):
             if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done:
                 continue
 
-            if inc == "id":
+            elif inc == "id":
                 device_ids.append(getattr(self, inc))
                 continue
 
-            if type(getattr(self, inc)) == list or "ParentList" in str(type(getattr(self, inc))):
+            elif type(getattr(self, inc)) == list or "ParentList" in str(type(getattr(self, inc))):
                 xml_sublist.append(ET.SubElement(parent_elem, "list"))
 
                 ## Determine if ParentList or just pure list.
@@ -702,7 +702,7 @@ class ObjectID(object):
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc)
                 self._to_xml_parse_list(xml_list_parse, xml_sublist[-1])
 
-            if hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
+            elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
                 xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
                 if xml_parse_id not in format_list and xml_parse_id not in device_ids:
@@ -713,7 +713,7 @@ class ObjectID(object):
                     format_elems.append(ET.SubElement(super_elems[1], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
                     getattr(self, inc).to_xml(parent_elem = format_elems[-1], format_list = format_list, device_ids = device_ids, parted_elems = parted_elems, super_elems = super_elems, parted_list = parted_list)
 
-            if "parted." in str(type(getattr(self, inc))) and (str(type(getattr(self, inc))).split("'")[1], format_list[-1]) not in parted_list:
+            elif "parted." in str(type(getattr(self, inc))) and (str(type(getattr(self, inc))).split("'")[1], format_list[-1]) not in parted_list:
                 parted_list.append((str(type(getattr(self, inc))).split("'")[1], format_list[-1]))
                 parted_elems.append(ET.SubElement(super_elems[2], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"format_id": str(format_list[-1])}))
                 self._to_xml_parse_parted(parted_elems[-1], format_list[-1], getattr(self, inc))
