@@ -1631,7 +1631,7 @@ class Populator(object):
             if xml_file == None:
                 self._populate()
             else:
-                self._populate_xml(xml_file)
+                self.from_xml(xml_file)
         except Exception:
             raise
         finally:
@@ -1640,7 +1640,7 @@ class Populator(object):
 ################################################################################
 ################################################################################
 ################################################################################
-    def _populate_xml(self, xml_file):
+    def from_xml(self, xml_file):
         """
             Populates a list with tuple containing class name and populated
             dictionary.
@@ -1651,7 +1651,16 @@ class Populator(object):
         device_list = self._from_xml_iterate_master(xml_root[0])
         format_list = self._from_xml_iterate_master(xml_root[1])
 
-        print (device_list)
+        for inc in device_list:
+            print (inc, "\n")
+        #self._from_xml_into_instances(device_list)
+
+    def _from_xml_into_instances(self, in_list):
+        devices = []
+        for inc in in_list:
+            self.names.append(inc[1].get("name"))
+            devices.append(inc[0])
+        self.populated = True
 
     def _from_xml_iterate_attrs(self, in_list, in_elem):
 
@@ -1684,6 +1693,13 @@ class Populator(object):
             attr_type = type_dict.get(attr_type)
             attr_value = attr_type(in_elem.text)
 
+        elif in_elem.text == "False":
+            attr_value = False
+        elif in_elem.text == "True":
+            attr_value = True
+        elif in_elem.text == None:
+            attr_value = ''
+
         else:
             attr_value = ''
 
@@ -1699,6 +1715,7 @@ class Populator(object):
         in_list = []
         for inc in in_elem:
             in_list.append((inc.tag, {}))
+            in_list[-1][1].update({"name": inc.attrib.get("name")})
             self._from_xml_iterate_attrs(in_list[-1], inc)
         return in_list
 
