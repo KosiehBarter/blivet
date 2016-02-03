@@ -1680,7 +1680,12 @@ class Populator(object):
 
     def _from_xml_parse_list(self, in_elem):
         ret_list = []
-        pass
+        for inc in in_elem:
+            if inc == None:
+                return None
+            else:
+                attr_value = self._from_xml_determine_type(inc)
+                ret_list.append(attr_value)
 
     def _from_xml_determine_type(self, in_elem):
         attr_type = in_elem.attrib.get("type")
