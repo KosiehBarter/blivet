@@ -702,6 +702,10 @@ class ObjectID(object):
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc)
                 self._to_xml_parse_list(xml_list_parse, xml_sublist[-1])
 
+            elif type(getattr(self, inc)) == tuple:
+                xml_sublist.append(ET.SubElement(parent_elem, "tuple", {"attr": str(inc), "type": str(tuple).split("'")[1]}))
+                self._to_xml_parse_tuple(getattr(self, inc), xml_sublist[-1])
+
             elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
                 xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
@@ -730,8 +734,6 @@ class ObjectID(object):
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc, full_bool = True, integer_override = integer_override)
             elems_done.append(inc)
 
-        self._to_xml_indent(parent_elem)
-
     def _to_xml_parse_parted(self, parent_elem, in_id, in_obj):
         xml_sub_parted_list = []
         xml_sub_parted_list.append(ET.SubElement(parent_elem, "fulltype"))
@@ -745,9 +747,13 @@ class ObjectID(object):
         for inc in allowed_attrs:
             try:
                 if getattr(in_obj, inc) != None:
-                    xml_sub_parted_list.append(ET.SubElement(parent_elem, "prop"))
-                    xml_sub_parted_list[-1].text = str(getattr(in_obj, inc))
-                    xml_sub_parted_list[-1].set("attr", str(inc))
+                    if type(getattr(in_obj, inc)) == tuple:
+                        xml_sub_parted_list.append(ET.SubElement(parent_elem, "tuple", {"attr": str(inc), "type": str(tuple).split("'")[1]}))
+                        self._to_xml_parse_tuple(getattr(in_obj, inc), xml_sub_parted_list[-1])
+                    else:
+                        xml_sub_parted_list.append(ET.SubElement(parent_elem, "prop"))
+                        xml_sub_parted_list[-1].text = str(getattr(in_obj, inc))
+                        xml_sub_parted_list[-1].set("attr", str(inc))
                     try:
                         xml_sub_parted_list[-1].set("type", str(type(getattr(in_obj, inc))).split("'")[1])
                     except:
@@ -755,6 +761,13 @@ class ObjectID(object):
             except:
                 continue
 
+    def _to_xml_parse_tuple(self, in_tuple, in_elem):
+        tuple_list = []
+        for inc in in_tuple:
+            tuple_list.append(ET.SubElement(in_elem, "item"))
+            #tuple_list[-1].set("type", str(type(getattr(self, inc))).split("\'")[1])
+            tuple_list[-1].text = str(inc)
+            tuple_list[-1].set("type", str(type(inc)).split("\'")[1])
 
     def _to_xml_parse_list(self, input_list, parent_index):
         """
