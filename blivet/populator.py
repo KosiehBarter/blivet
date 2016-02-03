@@ -1637,28 +1637,77 @@ class Populator(object):
         finally:
             parted.clear_exn_handler()
             self.restore_configs()
-
+################################################################################
+################################################################################
+################################################################################
     def _populate_xml(self, xml_file):
+        """
+            Populates a list with tuple containing class name and populated
+            dictionary.
+
+        """
         xml_root = self._from_xml_get_root(xml_file)
 
         device_list = self._from_xml_iterate_master(xml_root[0])
         format_list = self._from_xml_iterate_master(xml_root[1])
 
-        type_dict = {"str": str, "bool": bool, "int": int}
+        print (device_list)
+
+    def _from_xml_iterate_attrs(self, in_list, in_elem):
+
+        counter = 0
+        for inc in in_elem:
+            ## For the start, skip WIP elements
+            if inc.tag == "fulltype" or inc.tag == "Child_ID":
+                continue
+
+            if inc.tag == "list":
+                attr_value = self._from_xml_parse_list(inc)
+
+            else:
+                attr_value = self._from_xml_determine_type(inc)
+                in_list[1].update({inc.attrib.get("attr"): attr_value})
+
+
+    def _from_xml_parse_list(self, in_elem):
+        ret_list = []
+        pass
+
+    def _from_xml_determine_type(self, in_elem):
+        attr_type = in_elem.attrib.get("type")
+        type_dict = {"str": str, "int": int}
+
+        if attr_type == "NoneType":
+            attr_value = None
+
+        elif attr_type in type_dict.keys():
+            attr_type = type_dict.get(attr_type)
+            attr_value = attr_type(in_elem.text)
+
+        else:
+            attr_value = ''
+
+        return attr_value
 
 
     def _from_xml_iterate_master(self, in_elem):
-        # First, create format dict.
-        in_dict = []
+        """
+            This basically gets basic information, stores it as tuple,
+            where first "element" is a name of class and second dictionary
+            to store to.
+        """
+        in_list = []
         for inc in in_elem:
-            in_dict.append(inc.tag)
-        return in_dict
+            in_list.append((inc.tag, {}))
+            self._from_xml_iterate_attrs(in_list[-1], inc)
+        return in_list
 
     def _from_xml_get_root(self, in_file):
         xml_root = ET.parse(in_file).getroot()
         return [xml_root[0], xml_root[1]]
-
-
+################################################################################
+################################################################################
+################################################################################
     def _populate(self):
         log.info("DeviceTree.populate: ignored_disks is %s ; exclusive_disks is %s",
                  self.ignored_disks, self.exclusive_disks)

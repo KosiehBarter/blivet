@@ -734,7 +734,7 @@ class ObjectID(object):
 
     def _to_xml_parse_parted(self, parent_elem, in_id, in_obj):
         xml_sub_parted_list = []
-        xml_sub_parted_list.append(ET.SubElement(parent_elem, "fullname"))
+        xml_sub_parted_list.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sub_parted_list[-1].text = str(type(in_obj)).split("'")[1]
 
         allowed_attrs = ["type", "lastPartitionNumber", "maxPartitionLength", "maxPartitionStartSector", "maxPrimaryPartitionCount", "maxSupportedPartitionCount", "primaryPartitionCount",
@@ -748,6 +748,10 @@ class ObjectID(object):
                     xml_sub_parted_list.append(ET.SubElement(parent_elem, "prop"))
                     xml_sub_parted_list[-1].text = str(getattr(in_obj, inc))
                     xml_sub_parted_list[-1].set("attr", str(inc))
+                    try:
+                        xml_sub_parted_list[-1].set("type", str(type(getattr(in_obj, inc))).split("'")[1])
+                    except:
+                        continue
             except:
                 continue
 
