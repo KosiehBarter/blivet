@@ -27,6 +27,7 @@ import pprint
 import copy
 import parted
 import xml.etree.ElementTree as ET
+import importlib
 
 import gi
 gi.require_version("BlockDev", "1.0")
@@ -1646,21 +1647,57 @@ class Populator(object):
             dictionary.
 
         """
+        self.populated = False
         xml_root = self._from_xml_get_root(xml_file)
 
         device_list = self._from_xml_iterate_master(xml_root[0])
         format_list = self._from_xml_iterate_master(xml_root[1])
 
-        for inc in device_list:
-            print (inc, "\n")
-        #self._from_xml_into_instances(device_list)
+        #init_format_list = self._from_xml_set_class(format_list, xml_root[1])
+        init_device_list = self._from_xml_set_class(device_list, xml_root[0])
 
-    def _from_xml_into_instances(self, in_list):
-        devices = []
-        for inc in in_list:
-            self.names.append(inc[1].get("name"))
-            devices.append(inc[0])
+        devices = init_device_list
         self.populated = True
+
+    def _from_xml_set_class(self, in_list, in_elem):
+        """
+            This imports and loads class from XML, by fulltype tag.
+        """
+
+        class_list = []
+        counter = 0
+        for inc in in_list:
+            imp_path, imp_mod = self._from_xml_parse_module(in_elem[counter][0])
+
+            class_list.append(getattr(importlib.import_module(imp_path), imp_mod))
+            class_list[-1] = self._from_xml_init_class(inc, class_list[-1])
+            counter += 1
+        return class_list
+
+    def _from_xml_init_class(self, in_tuple, in_obj):
+        """
+            This initiates class object and makes instace of it.
+        """
+        attr_name = in_tuple[1].get("name")
+        attr_id = in_tuple[1].get("id")
+        try:
+            in_obj = in_obj(attr_name)
+            setattr(in_obj, "xml_id", attr_id)
+            return in_obj
+        except Exception as e:
+            print (e, in_obj, attr_name)
+
+    def _from_xml_parse_module(self, in_elem):
+        """
+            This function basically parses a name from fulltype element or any
+            other input element.
+        """
+        imp_path = ""
+        for inc in range(len(in_elem.text.split(".")) - 1):
+            imp_path = imp_path + "." + in_elem.text.split(".")[inc]
+        imp_mod = in_elem.text.split(".")[-1]
+        return (imp_path[1:], imp_mod)
+
 
     def _from_xml_iterate_attrs(self, in_list, in_elem):
 
@@ -1670,7 +1707,10 @@ class Populator(object):
             if inc.tag == "fulltype" or inc.tag == "Child_ID":
                 continue
 
-            if inc.tag == "list":
+            if inc.attrib.get("attr") == "parents":
+                attr_value = self._from_xml_get_parents(inc, in_list)
+
+            if inc.tag == "list" and inc.attrib.get("attr") != "parents":
                 attr_value = self._from_xml_parse_list(inc)
 
             else:
@@ -1682,10 +1722,17 @@ class Populator(object):
         ret_list = []
         for inc in in_elem:
             if inc == None:
-                return None
+                return []
             else:
                 attr_value = self._from_xml_determine_type(inc)
                 ret_list.append(attr_value)
+
+    def _from_xml_get_parents(self, in_elem, in_list):
+        par_list = []
+        for inc in
+
+
+
 
     def _from_xml_determine_type(self, in_elem):
         attr_type = in_elem.attrib.get("type")
@@ -1721,6 +1768,7 @@ class Populator(object):
         for inc in in_elem:
             in_list.append((inc.tag, {}))
             in_list[-1][1].update({"name": inc.attrib.get("name")})
+            in_list[-1][1].update({"id": int(inc.attrib.get("id"))})
             self._from_xml_iterate_attrs(in_list[-1], inc)
         return in_list
 
