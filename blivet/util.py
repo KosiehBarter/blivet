@@ -682,7 +682,7 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done or "dependencies" in inc:
+            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done or "dependencies" in inc or "abc" in inc:
                 continue
 
             elif inc == "id":
