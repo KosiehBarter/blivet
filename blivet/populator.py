@@ -1649,43 +1649,65 @@ class Populator(object):
         """
         self.populated = False
         xml_root = self._from_xml_get_root(xml_file)
+        complete_devices = []
 
         device_list = self._from_xml_iterate_master(xml_root[0])
-        format_list = self._from_xml_iterate_master(xml_root[1])
+        #format_list = self._from_xml_iterate_master(xml_root[1])
 
-        #init_format_list = self._from_xml_set_class(format_list, xml_root[1])
-        init_device_list = self._from_xml_set_class(device_list, xml_root[0])
+        self._from_xml_set_class(device_list, xml_root[0], complete_devices)
 
-        devices = init_device_list
-        self.populated = True
-
-    def _from_xml_set_class(self, in_list, in_elem):
+    def _from_xml_set_class(self, in_list, in_elem, complete_devices):
         """
             This imports and loads class from XML, by fulltype tag.
         """
 
-        class_list = []
         counter = 0
         for inc in in_list:
             imp_path, imp_mod = self._from_xml_parse_module(in_elem[counter][0])
 
-            class_list.append(getattr(importlib.import_module(imp_path), imp_mod))
-            class_list[-1] = self._from_xml_init_class(inc, class_list[-1])
+            temp_tuple = (getattr(importlib.import_module(imp_path), imp_mod), in_list[counter][1], in_list[counter][0])
+            in_list[counter] = temp_tuple
+            self._from_xml_init_class(in_list[counter], complete_devices)
             counter += 1
-        return class_list
 
-    def _from_xml_init_class(self, in_tuple, in_obj):
+    def _from_xml_init_class(self, in_tuple, complete_devices):
         """
             This initiates class object and makes instace of it.
         """
+        obj_name = in_tuple[2]
+        class_list = []
+
         attr_name = in_tuple[1].get("name")
-        attr_id = in_tuple[1].get("id")
+        attr_xml_id = in_tuple[1].get("xml_id")
+
         try:
-            in_obj = in_obj(attr_name)
-            setattr(in_obj, "xml_id", attr_id)
-            return in_obj
+            ## Lets prepare the object before init
+            temp_obj = in_tuple[0]
+            if "MDRaidArrayDevice" in obj_name:
+                ## Get member ids
+                members_ids = in_tuple[1].get("members_ids")
+                ## Get objects from member ids
+                attr_members = self._from_xml_get_raid_members(in_tuple, complete_devices, members_ids)
+                ## get level
+                attr_level = in_tuple[1].get("level")
+
+                temp_obj = temp_obj(attr_name, level = attr_level)
+            else:
+                temp_obj = temp_obj(attr_name)
+
+            ## Finally, store back in tuple
+            setattr(temp_obj, "xml_id", attr_xml_id)
+            in_tuple = (temp_obj, in_tuple[1], in_tuple[2])
+            ## Add XML_ID to completed devices to prevent duplicates
+            complete_devices.append(temp_obj)
         except Exception as e:
-            print (e, in_obj, attr_name)
+            print (e)
+
+    def _from_xml_get_raid_members(self, in_tuple, complete_devices, in_list):
+        ## Check complete_devices first
+        member_list = []
+        return member_list
+
 
     def _from_xml_parse_module(self, in_elem):
         """
@@ -1700,6 +1722,11 @@ class Populator(object):
 
 
     def _from_xml_iterate_attrs(self, in_list, in_elem):
+        """
+            This parses attr_name = attr_value into a dictionary.
+            Structure of the the data: [(Object, {attr\: name, and so on..})]
+        """
+        par_elems = ["parents", "members"]
 
         counter = 0
         for inc in in_elem:
@@ -1707,10 +1734,11 @@ class Populator(object):
             if inc.tag == "fulltype" or inc.tag == "Child_ID":
                 continue
 
-            if inc.attrib.get("attr") == "parents":
-                attr_value = self._from_xml_get_parents(inc, in_list)
+            if inc.attrib.get("attr") in par_elems:
+                attr_value = self._from_xml_parse_parents(inc)
+                in_list[1].update({inc.attrib.get("attr") + "_ids": attr_value})
 
-            if inc.tag == "list" and inc.attrib.get("attr") != "parents":
+            elif inc.tag == "list" and inc.attrib.get("attr") != "parents":
                 attr_value = self._from_xml_parse_list(inc)
 
             else:
@@ -1719,6 +1747,9 @@ class Populator(object):
 
 
     def _from_xml_parse_list(self, in_elem):
+        """
+            General function for getting attributes from list XML elements.
+        """
         ret_list = []
         for inc in in_elem:
             if inc == None:
@@ -1727,14 +1758,42 @@ class Populator(object):
                 attr_value = self._from_xml_determine_type(inc)
                 ret_list.append(attr_value)
 
-    def _from_xml_get_parents(self, in_elem, in_list):
+    def _from_xml_parse_parents(self, in_elem):
+        """
+            This basically gets the ID of parents from XML file, nothing else.
+        """
         par_list = []
-        for inc in
+        for inc in in_elem:
+            if inc == None:
+                break
+            else:
+                par_list.append(int(inc.text))
+        return par_list
 
-
-
+    def _from_xml_iterate_master(self, in_elem):
+        """
+            This basically gets basic information, stores it as tuple,
+            where first "element" is a name of class and second dictionary
+            to store to.
+        """
+        in_list = []
+        for inc in in_elem:
+            in_list.append((inc.tag, {}))
+            in_list[-1][1].update({"name": inc.attrib.get("name")})
+            in_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
+            print (in_list[-1])
+            self._from_xml_iterate_attrs(in_list[-1], inc)
+        return in_list
 
     def _from_xml_determine_type(self, in_elem):
+        """
+            Determines type of attribute by getting its type from XML "type"
+            attrib or by reading a element.text.
+        """
+
+        ## Special attributes, that can be used as strings.
+        string_attrs = ["blivet.devicelibs.raid.RAID1"]
+
         attr_type = in_elem.attrib.get("type")
         type_dict = {"str": str, "int": int}
 
@@ -1747,8 +1806,13 @@ class Populator(object):
 
         elif in_elem.text == "False":
             attr_value = False
+
         elif in_elem.text == "True":
             attr_value = True
+
+        elif in_elem.attrib.get("type") in string_attrs:
+            attr_value = in_elem.text
+
         elif in_elem.text == None:
             attr_value = ''
 
@@ -1757,22 +1821,10 @@ class Populator(object):
 
         return attr_value
 
-
-    def _from_xml_iterate_master(self, in_elem):
-        """
-            This basically gets basic information, stores it as tuple,
-            where first "element" is a name of class and second dictionary
-            to store to.
-        """
-        in_list = []
-        for inc in in_elem:
-            in_list.append((inc.tag, {}))
-            in_list[-1][1].update({"name": inc.attrib.get("name")})
-            in_list[-1][1].update({"id": int(inc.attrib.get("id"))})
-            self._from_xml_iterate_attrs(in_list[-1], inc)
-        return in_list
-
     def _from_xml_get_root(self, in_file):
+        """
+            This returns basic XML elements: Devices and Formats.
+        """
         xml_root = ET.parse(in_file).getroot()
         return [xml_root[0], xml_root[1]]
 ################################################################################
