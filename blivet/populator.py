@@ -1650,13 +1650,18 @@ class Populator(object):
         self.populated = False
         xml_root = self._from_xml_get_root(xml_file)
         complete_devices = []
+        device_stack = []
 
         device_list = self._from_xml_iterate_master(xml_root[0])
-        #format_list = self._from_xml_iterate_master(xml_root[1])
 
-        self._from_xml_set_class(device_list, xml_root[0], complete_devices)
+        format_list = self._from_xml_iterate_master(xml_root[1])
 
-    def _from_xml_set_class(self, in_list, in_elem, complete_devices):
+        self._from_xml_set_class(device_list, xml_root[0], complete_devices, device_stack)
+
+        for inc in device_list:
+            print (inc[0])
+
+    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack):
         """
             This imports and loads class from XML, by fulltype tag.
         """
@@ -1667,47 +1672,48 @@ class Populator(object):
 
             temp_tuple = (getattr(importlib.import_module(imp_path), imp_mod), in_list[counter][1], in_list[counter][0])
             in_list[counter] = temp_tuple
-            self._from_xml_init_class(in_list[counter], complete_devices)
+            in_list[counter] = self._from_xml_init_class(in_list[counter], complete_devices, device_stack)
             counter += 1
 
-    def _from_xml_init_class(self, in_tuple, complete_devices):
+    def _from_xml_init_class(self, in_tuple, complete_devices, device_stack):
         """
             This initiates class object and makes instace of it.
         """
         obj_name = in_tuple[2]
-        class_list = []
 
         attr_name = in_tuple[1].get("name")
         attr_xml_id = in_tuple[1].get("xml_id")
 
-        try:
-            ## Lets prepare the object before init
-            temp_obj = in_tuple[0]
-            if "MDRaidArrayDevice" in obj_name:
-                ## Get member ids
-                members_ids = in_tuple[1].get("members_ids")
-                ## Get objects from member ids
-                attr_members = self._from_xml_get_raid_members(in_tuple, complete_devices, members_ids)
-                ## get level
-                attr_level = in_tuple[1].get("level")
+        ## Lets prepare the object before init
+        temp_obj = in_tuple[0]
+        if "MDRaidArrayDevice" in obj_name or "BTRFS" in obj_name or "LVM" in obj_name and in_tuple not in device_stack:
+            device_stack.append(in_tuple)
 
-                temp_obj = temp_obj(attr_name, level = attr_level)
-            else:
-                temp_obj = temp_obj(attr_name)
+        else:
+            temp_obj = temp_obj(attr_name)
 
-            ## Finally, store back in tuple
-            setattr(temp_obj, "xml_id", attr_xml_id)
-            in_tuple = (temp_obj, in_tuple[1], in_tuple[2])
-            ## Add XML_ID to completed devices to prevent duplicates
-            complete_devices.append(temp_obj)
-        except Exception as e:
-            print (e)
+        ## Finally, store back in tuple
+        setattr(temp_obj, "xml_id", attr_xml_id)
+        in_tuple = (temp_obj, in_tuple[1], in_tuple[2])
 
-    def _from_xml_get_raid_members(self, in_tuple, complete_devices, in_list):
-        ## Check complete_devices first
-        member_list = []
-        return member_list
 
+        ## Add XML_ID to completed devices to prevent duplicates
+        complete_devices.append(temp_obj)
+        return in_tuple
+
+    def _from_xml_set_attrs(self, in_tuple):
+        temp_obj = in_tuple[0]
+
+        ignored_attrs = ["id", "name"]
+        for inc in in_tuple[1]:
+            if inc.keys() not in ignored_attrs:
+                print (inc)
+
+
+    def _from_xml_get_raid_mem(self, member_list, complete_devices, in_tuple, member_ids):
+        for inc in complete_devices:
+            if getattr(inc, "xml_id") in member_ids:
+                member_list.append(inc)
 
     def _from_xml_parse_module(self, in_elem):
         """
@@ -1781,7 +1787,6 @@ class Populator(object):
             in_list.append((inc.tag, {}))
             in_list[-1][1].update({"name": inc.attrib.get("name")})
             in_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
-            print (in_list[-1])
             self._from_xml_iterate_attrs(in_list[-1], inc)
         return in_list
 
