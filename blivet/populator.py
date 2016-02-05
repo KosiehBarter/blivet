@@ -1641,6 +1641,10 @@ class Populator(object):
 ################################################################################
 ################################################################################
 ################################################################################
+
+### TODO: NAIMPLEMENTUJ PROCHAZEJI STACKEM - DEVICE_STACK A NASTAVOVANI ATRIBUTU
+
+
     def from_xml(self, xml_file):
         """
             Populates a list with tuple containing class name and populated
@@ -1657,11 +1661,9 @@ class Populator(object):
         format_list = self._from_xml_iterate_master(xml_root[1])
 
         self._from_xml_set_class(device_list, xml_root[0], complete_devices, device_stack)
+        print (device_list)
 
-        for inc in device_list:
-            print (inc[0])
-
-    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack):
+    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack = None):
         """
             This imports and loads class from XML, by fulltype tag.
         """
@@ -1675,7 +1677,7 @@ class Populator(object):
             in_list[counter] = self._from_xml_init_class(in_list[counter], complete_devices, device_stack)
             counter += 1
 
-    def _from_xml_init_class(self, in_tuple, complete_devices, device_stack):
+    def _from_xml_init_class(self, in_tuple, complete_devices, device_stack = None):
         """
             This initiates class object and makes instace of it.
         """
@@ -1688,26 +1690,20 @@ class Populator(object):
         temp_obj = in_tuple[0]
         if "MDRaidArrayDevice" in obj_name or "BTRFS" in obj_name or "LVM" in obj_name and in_tuple not in device_stack:
             device_stack.append(in_tuple)
+        elif device_stack == None:
+
 
         else:
             temp_obj = temp_obj(attr_name)
 
-        ## Finally, store back in tuple
+        ## Finally, store back in tuple and assign auxiliary ID
         setattr(temp_obj, "xml_id", attr_xml_id)
+        ## set attributes to object
         in_tuple = (temp_obj, in_tuple[1], in_tuple[2])
-
-
         ## Add XML_ID to completed devices to prevent duplicates
+        #self._from_xml_set_attrs(in_tuple)
         complete_devices.append(temp_obj)
         return in_tuple
-
-    def _from_xml_set_attrs(self, in_tuple):
-        temp_obj = in_tuple[0]
-
-        ignored_attrs = ["id", "name"]
-        for inc in in_tuple[1]:
-            if inc.keys() not in ignored_attrs:
-                print (inc)
 
 
     def _from_xml_get_raid_mem(self, member_list, complete_devices, in_tuple, member_ids):
@@ -1749,7 +1745,10 @@ class Populator(object):
 
             else:
                 attr_value = self._from_xml_determine_type(inc)
-                in_list[1].update({inc.attrib.get("attr"): attr_value})
+                if type(attr_value) == tuple:
+                    in_list[1].update({attr_value[0]: attr_value[1]})
+                else:
+                    in_list[1].update({inc.attrib.get("attr"): attr_value})
 
 
     def _from_xml_parse_list(self, in_elem):
@@ -1822,7 +1821,9 @@ class Populator(object):
             attr_value = ''
 
         else:
-            attr_value = ''
+            attr_type = in_elem.attrib.get("type")
+            temp_val = in_elem.text
+            attr_value = attr_type, temp_val
 
         return attr_value
 
