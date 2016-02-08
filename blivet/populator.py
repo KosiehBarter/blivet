@@ -1754,14 +1754,23 @@ class Populator(object):
                 return True
         return False
 
-    def _fxml_init_class(self):
-        counter = 0
-        for inc in self.device_list:
-            temp_dict = inc[1]
-            temp_obj = inc[0](temp_dict.get("name"))
-            temp_tuple = (temp_obj, temp_dict)
-            self.device_list[counter] = temp_tuple
-            counter += 1
+    def _fxml_init_class(self, index = None):
+        """
+            This will init the class as well as point stack list to objects that
+            will be processed afterwards.
+        """
+        if index == None:
+            index = -1
+        temp_obj_str = self.device_list[index][0]
+        temp_obj_dict = self.device_dict[index][1]
+
+        if self._fxml_check_name(temp_obj_str):
+            self.device_stack.append(index)
+        else:
+            pass ## TODO: DOKONCI
+
+
+
 
 
     def _fxml_get_class_obj(self, in_elem):
@@ -1770,7 +1779,7 @@ class Populator(object):
             Special cases are set too, but also its indexes are stored too into
             stack.
         """
-        stack_names = ["Raid", "LVM", "BTRFS"]
+
         mod_path, class_name = self._fxml_parse_module(in_elem[0])
         name_bool = self._fxml_check_name(class_name)
 
@@ -1786,8 +1795,7 @@ class Populator(object):
         """
         ## Iterate trough elems
         for inc in in_elems:
-            obj_class = self._fxml_get_class_obj(inc)
-            self.device_list.append((obj_class, {}))
+            self.device_list.append((inc[0].text, {}))
             self.device_list[-1][1].update({"name": inc.attrib.get("name")})
             self.device_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
             self._fxml_parse_attributes(inc)
