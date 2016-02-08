@@ -1649,186 +1649,152 @@ class Populator(object):
         """
             Populates a list with tuple containing class name and populated
             dictionary.
-
         """
         self.populated = False
-        xml_root = self._from_xml_get_root(xml_file)
+        xml_root = self._fxml_get_root(xml_file)
         complete_devices = []
-        device_stack = []
+        self.device_stack = []
 
-        device_list = self._from_xml_iterate_master(xml_root[0])
-        format_list = self._from_xml_iterate_master(xml_root[1])
+        ## Define basic shared lists
+        self.device_list = []
+        self.format_list = []
 
-        self._from_xml_set_class(device_list, xml_root[0], complete_devices, device_stack)
+        self._fxml_iterate_master(xml_root[0])
+        #self._fxml_iterate_master(xml_root[1])
 
-        for inc in device_list:
-            print (inc, "\n")
-
-    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack = None, parse_stack = False):
-        """
-            This imports and loads class from XML, by fulltype tag.
-        """
-
-        counter = 0
-        for inc in in_list:
-            imp_path, imp_mod = self._from_xml_parse_module(in_elem[counter][0])
-
-            temp_tuple = (getattr(importlib.import_module(imp_path), imp_mod), in_list[counter][1], in_list[counter][0])
-            if "MDRaidArrayDevice" in temp_tuple[2] or "BTRFS" in temp_tuple[2] or "LVM" in temp_tuple[2] and temp_tuple not in device_stack:
-                device_stack.append(temp_tuple)
-            else:
-                in_list[counter] = temp_tuple
-                in_list[counter] = self._from_xml_init_class(in_list[counter], complete_devices, device_stack)
-            counter += 1
-
-    def _from_xml_init_class(self, in_tuple, complete_devices, device_stack = None):
-        """
-            This initiates class object and makes instace of it.
-        """
-        obj_name = in_tuple[2]
-
-        attr_name = in_tuple[1].get("name")
-        attr_xml_id = in_tuple[1].get("xml_id")
-
-        ## Lets prepare the object before init
-        temp_obj = in_tuple[0]
-        temp_obj = temp_obj(attr_name)
-
-        ## Finally, store back in tuple and assign auxiliary ID
-        setattr(temp_obj, "xml_id", attr_xml_id)
-        ## set attributes to object
-        in_tuple = (temp_obj, in_tuple[1], in_tuple[2])
-        ## Add XML_ID to completed devices to prevent duplicates
-        #self._from_xml_set_attrs(in_tuple)
-        complete_devices.append(temp_obj)
-        return in_tuple
+        for inc in self.device_list:
+            print (inc[0])
 
 
-    def _from_xml_get_raid_mem(self, member_list, complete_devices, in_tuple, member_ids):
-        for inc in complete_devices:
-            if getattr(inc, "xml_id") in member_ids:
-                member_list.append(inc)
-
-    def _from_xml_parse_module(self, in_elem):
+    def _fxml_parse_module(self, in_elem = None, in_text = None):
         """
             This function basically parses a name from fulltype element or any
             other input element.
         """
+        ## This decides if to parse from text or element
         imp_path = ""
-        for inc in range(len(in_elem.text.split(".")) - 1):
-            imp_path = imp_path + "." + in_elem.text.split(".")[inc]
-        imp_mod = in_elem.text.split(".")[-1]
+
+        if in_elem == None:
+            str_parse_mod = in_text
+        else:
+            str_parse_mod = in_elem.text
+
+        for inc in range(len(str_parse_mod.split(".")) - 1):
+            imp_path = imp_path + "." + str_parse_mod.split(".")[inc]
+        imp_mod = str_parse_mod.split(".")[-1]
         return (imp_path[1:], imp_mod)
 
-
-    def _from_xml_iterate_attrs(self, in_list, in_elem):
+    def _fxml_attr_type_determ(self, in_elem):
         """
-            This parses attr_name = attr_value into a dictionary.
-            Structure of the the data: [(Object, {attr\: name, and so on..})]
+            This function decides what kind of value will be returned as well as
+            returns the value in certain type.
         """
-        par_elems = ["parents", "members"]
+        basic_types = {"str": str, "int": int, "float": float}
+        attr_type = basic_types.get(in_elem.attrib.get("type"))
 
-        counter = 0
-        for inc in in_elem:
-            ## For the start, skip WIP elements
-            if inc.tag == "fulltype":
-                continue
+        if attr_type == None:
+            ## Checks for False / True
+            if in_elem.text == "True":
+                return True
+            elif in_elem.text == "False":
+                return False
+            ## Check for None
+            elif in_elem.text == "None":
+                return None
+            ## Check for complicated attribute - size
+            elif "size" in in_elem.attrib.get("attr"):
+                full_module = in_elem.attrib.get("type")
+                mod_path, imp_mod = self._fxml_parse_module(None, full_module)
+                attr_value = getattr(importlib.import_module(mod_path), imp_mod)()
+                setattr(attr_value, in_elem.attrib.get("attr"), int(in_elem.text))
 
-            if inc.attrib.get("attr") in par_elems:
-                attr_value = self._from_xml_parse_parents(inc)
-                in_list[1].update({inc.attrib.get("attr") + "_ids": attr_value})
-
-            elif inc.tag == "list" and inc.attrib.get("attr") != "parents":
-                attr_value = self._from_xml_parse_list(inc)
-
-            elif inc.tag == "Child_ID":
-                in_list[1].update({"format_id": int(inc.text)})
-
+            ## If it fails, give it now just None
             else:
-                attr_value = self._from_xml_determine_type(inc)
-                if type(attr_value) == tuple:
-                    in_list[1].update({attr_value[0]: attr_value[1]})
-                else:
-                    in_list[1].update({inc.attrib.get("attr"): attr_value})
-
-
-    def _from_xml_parse_list(self, in_elem):
-        """
-            General function for getting attributes from list XML elements.
-        """
-        ret_list = []
-        for inc in in_elem:
-            if inc == None:
-                return []
-            else:
-                attr_value = self._from_xml_determine_type(inc)
-                ret_list.append(attr_value)
-
-    def _from_xml_parse_parents(self, in_elem):
-        """
-            This basically gets the ID of parents from XML file, nothing else.
-        """
-        par_list = []
-        for inc in in_elem:
-            if inc == None:
-                break
-            else:
-                par_list.append(int(inc.text))
-        return par_list
-
-    def _from_xml_iterate_master(self, in_elem):
-        """
-            This basically gets basic information, stores it as tuple,
-            where first "element" is a name of class and second dictionary
-            to store to.
-        """
-        in_list = []
-        for inc in in_elem:
-            in_list.append((inc.tag, {}))
-            in_list[-1][1].update({"name": inc.attrib.get("name")})
-            in_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
-            self._from_xml_iterate_attrs(in_list[-1], inc)
-        return in_list
-
-    def _from_xml_determine_type(self, in_elem):
-        """
-            Determines type of attribute by getting its type from XML "type"
-            attrib or by reading a element.text.
-        """
-
-        ## Special attributes, that can be used as strings.
-        string_attrs = ["blivet.devicelibs.raid.RAID1"]
-
-        attr_type = in_elem.attrib.get("type")
-        type_dict = {"str": str, "int": int}
-
-        if attr_type == "NoneType":
-            attr_value = None
-
-        elif attr_type in type_dict.keys():
-            attr_type = type_dict.get(attr_type)
-            attr_value = attr_type(in_elem.text)
-
-        elif in_elem.text == "False":
-            attr_value = False
-
-        elif in_elem.text == "True":
-            attr_value = True
-
-        elif in_elem.attrib.get("type") in string_attrs:
-            attr_value = in_elem.text
-
-        elif in_elem.text == None:
-            attr_value = ''
-
+                attr_value = None
         else:
-            attr_type = in_elem.attrib.get("type")
-            temp_val = in_elem.text
-            attr_value = attr_type, temp_val
-
+            attr_value = attr_type(in_elem.text)
         return attr_value
 
-    def _from_xml_get_root(self, in_file):
+    def _fxml_get_lists(self, in_elem):
+        """
+            This gets an element that contains subelements in the same structure as list.
+            It basically parses subelements into lists.
+        """
+        attr_list = []
+
+        for inc in in_elem:
+            attr_list.append(self._fxml_attr_type_determ(inc))
+        return attr_list
+
+    def _fxml_parse_attributes(self, in_master_elem):
+        """
+            All basic attributes are gathered here. This parses "type" attribute,
+            stores it in variable that then sets the content of Element.text.
+        """
+        list_typed_attrs = ["parents", "members", "ancestors"]
+        list_ignored_tags = ["fulltype", "Child_ID"]
+
+        for inc in in_master_elem:
+            if inc.tag in list_ignored_tags:
+                continue
+            elif inc.tag == "list" and inc.attrib.get("attr") not in list_typed_attrs:
+                attr_value = self._fxml_get_lists(inc)
+            else:
+                attr_value = self._fxml_attr_type_determ(inc)
+
+            self.device_list[-1][1].update({inc.attrib.get("attr"): attr_value})
+
+    def _fxml_check_name(self, class_name):
+        """
+            This checks, if its any of advanced devices that require any basic
+            device to work (mainly members for MDRaid and LVM)
+        """
+        for inc in ["Raid", "LVM", "BTRFS"]:
+            if inc in class_name:
+                return True
+        return False
+
+    def _fxml_init_class(self):
+        counter = 0
+        for inc in self.device_list:
+            temp_dict = inc[1]
+            temp_obj = inc[0](temp_dict.get("name"))
+            temp_tuple = (temp_obj, temp_dict)
+            self.device_list[counter] = temp_tuple
+            counter += 1
+
+
+    def _fxml_get_class_obj(self, in_elem):
+        """
+            Based on _fxml_parse_module, this will create a object, but uninitialized.
+            Special cases are set too, but also its indexes are stored too into
+            stack.
+        """
+        stack_names = ["Raid", "LVM", "BTRFS"]
+        mod_path, class_name = self._fxml_parse_module(in_elem[0])
+        name_bool = self._fxml_check_name(class_name)
+
+        if name_bool == True:
+            self.device_stack.append(len(self.device_list))
+        return getattr(importlib.import_module(mod_path), class_name)
+
+    def _fxml_iterate_master(self, in_elems):
+        """
+            This basically gets all objects from XML and sets them. It does not
+            initiate them, just prepares them to be initiated. Special cases like
+            RAID, BTRFS and LVM are stored too. See _fxml_get_class_obj() for details
+        """
+        ## Iterate trough elems
+        for inc in in_elems:
+            obj_class = self._fxml_get_class_obj(inc)
+            self.device_list.append((obj_class, {}))
+            self.device_list[-1][1].update({"name": inc.attrib.get("name")})
+            self.device_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
+            self._fxml_parse_attributes(inc)
+            self._fxml_init_class()
+
+
+    def _fxml_get_root(self, in_file):
         """
             This returns basic XML elements: Devices and Formats.
             Returns: list of ET.Element
