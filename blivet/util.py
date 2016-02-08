@@ -673,8 +673,6 @@ class ObjectID(object):
         else:
             input_data = dir(self)
 
-        ignored_attrs = ["sync", "dict", "mount", "parted_partition", "name", "_newid_gen", "_levels", "_newid_func"]
-
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sublist[-1].text = str(type(self)).split("'")[1]
         for inc in input_data:
@@ -682,7 +680,7 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if inc in ignored_attrs or callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done or "dependencies" in inc or "abc" in inc:
+            if callable(inc) or inc.startswith("__") or "method" in str(type(getattr(self, inc))) or inc in elems_done or "dependencies" in inc or self._to_xml_check_attrs(inc) or self._to_xml_check_types(self, inc):
                 continue
 
             elif inc == "id":
@@ -733,6 +731,22 @@ class ObjectID(object):
                     integer_override = False
                 self._to_xml_set_data(elem = xml_sublist[-1], tag = inc, full_bool = True, integer_override = integer_override)
             elems_done.append(inc)
+
+    def _to_xml_check_attrs(self, in_attr):
+
+        for inc in ["_abc_", "sync", "dict", "mount", "parted_partition", "name", "_newid_gen", "_levels", "_newid_func", "primary_partitions", "_plugin", "_info_class", "_resize", "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info"]:
+            if inc in in_attr:
+                return True
+        return False
+
+    def _to_xml_check_types(self, in_obj, inc):
+
+        type_in_str = str(type(getattr(in_obj, inc))).split("'")[1]
+
+        for inc in ["abc", "_ped.", ".tasks.", "function"]:
+            if inc in type_in_str:
+                return True
+        return False
 
     def _to_xml_parse_parted(self, parent_elem, in_id, in_obj):
         xml_sub_parted_list = []
