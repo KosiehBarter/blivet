@@ -1657,13 +1657,14 @@ class Populator(object):
         device_stack = []
 
         device_list = self._from_xml_iterate_master(xml_root[0])
-
         format_list = self._from_xml_iterate_master(xml_root[1])
 
         self._from_xml_set_class(device_list, xml_root[0], complete_devices, device_stack)
-        print (device_list)
 
-    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack = None):
+        for inc in device_list:
+            print (inc, "\n")
+
+    def _from_xml_set_class(self, in_list, in_elem, complete_devices, device_stack = None, parse_stack = False):
         """
             This imports and loads class from XML, by fulltype tag.
         """
@@ -1673,8 +1674,11 @@ class Populator(object):
             imp_path, imp_mod = self._from_xml_parse_module(in_elem[counter][0])
 
             temp_tuple = (getattr(importlib.import_module(imp_path), imp_mod), in_list[counter][1], in_list[counter][0])
-            in_list[counter] = temp_tuple
-            in_list[counter] = self._from_xml_init_class(in_list[counter], complete_devices, device_stack)
+            if "MDRaidArrayDevice" in temp_tuple[2] or "BTRFS" in temp_tuple[2] or "LVM" in temp_tuple[2] and temp_tuple not in device_stack:
+                device_stack.append(temp_tuple)
+            else:
+                in_list[counter] = temp_tuple
+                in_list[counter] = self._from_xml_init_class(in_list[counter], complete_devices, device_stack)
             counter += 1
 
     def _from_xml_init_class(self, in_tuple, complete_devices, device_stack = None):
@@ -1688,13 +1692,7 @@ class Populator(object):
 
         ## Lets prepare the object before init
         temp_obj = in_tuple[0]
-        if "MDRaidArrayDevice" in obj_name or "BTRFS" in obj_name or "LVM" in obj_name and in_tuple not in device_stack:
-            device_stack.append(in_tuple)
-        elif device_stack == None:
-
-
-        else:
-            temp_obj = temp_obj(attr_name)
+        temp_obj = temp_obj(attr_name)
 
         ## Finally, store back in tuple and assign auxiliary ID
         setattr(temp_obj, "xml_id", attr_xml_id)
@@ -1733,7 +1731,7 @@ class Populator(object):
         counter = 0
         for inc in in_elem:
             ## For the start, skip WIP elements
-            if inc.tag == "fulltype" or inc.tag == "Child_ID":
+            if inc.tag == "fulltype":
                 continue
 
             if inc.attrib.get("attr") in par_elems:
@@ -1742,6 +1740,9 @@ class Populator(object):
 
             elif inc.tag == "list" and inc.attrib.get("attr") != "parents":
                 attr_value = self._from_xml_parse_list(inc)
+
+            elif inc.tag == "Child_ID":
+                in_list[1].update({"format_id": int(inc.text)})
 
             else:
                 attr_value = self._from_xml_determine_type(inc)
@@ -1830,6 +1831,7 @@ class Populator(object):
     def _from_xml_get_root(self, in_file):
         """
             This returns basic XML elements: Devices and Formats.
+            Returns: list of ET.Element
         """
         xml_root = ET.parse(in_file).getroot()
         return [xml_root[0], xml_root[1]]
