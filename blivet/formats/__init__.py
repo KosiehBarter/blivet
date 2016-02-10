@@ -632,13 +632,6 @@ class DeviceFormat(ObjectID):
         data.fstype = self.type
         data.mountpoint = self.ks_mountpoint
 
-    def _to_xml_set_attrs(self):
-        return ["id", "name", "uuid", "type"]
-
-    def from_xml(self, **kwargs):
-        xml_root = ET.parse(kwargs.get("in_xml"))
-        return xml_root
-
 register_device_format(DeviceFormat)
 
 collect_device_format_classes()

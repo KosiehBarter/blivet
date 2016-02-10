@@ -122,10 +122,6 @@ class DiskDevice(StorageDevice):
 
         StorageDevice._pre_destroy(self)
 
-    def _to_xml_set_attrs(self):
-        return ["id", "name", "path", "size", "format", "parents", "sysfs_path"]
-
-
 class DiskFile(DiskDevice):
 
     """ This is a file that we will pretend is a disk.

@@ -891,6 +891,3 @@ class PartitionDevice(StorageDevice):
 
             if data.resize:
                 data.size = self.size.convert_to(MiB)
-
-    def _to_xml_set_attrs(self):
-        return ["id", "name", "path", "size", "format", "parents", "sysfs_path"]

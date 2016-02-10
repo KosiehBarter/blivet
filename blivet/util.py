@@ -668,10 +668,7 @@ class ObjectID(object):
         xml_sublist = []
         xml_child_sublist = []
 
-        if full_dump != None and hasattr(self, "_to_xml_set_attrs"):
-            input_data = self._to_xml_set_attrs()
-        else:
-            input_data = dir(self)
+        input_data = dir(self)
 
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
         xml_sublist[-1].text = str(type(self)).split("'")[1]
