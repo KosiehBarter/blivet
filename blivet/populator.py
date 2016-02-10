@@ -1638,13 +1638,9 @@ class Populator(object):
         finally:
             parted.clear_exn_handler()
             self.restore_configs()
-################################################################################
-################################################################################
-################################################################################
 
-### TODO: NAIMPLEMENTUJ PROCHAZEJI STACKEM - DEVICE_STACK A NASTAVOVANI ATRIBUTU
-
-
+################################################################################
+###################### BASIC FUNCTIONS #########################################
     def from_xml(self, xml_file):
         """
             Populates a list with tuple containing class name and populated
@@ -1659,14 +1655,30 @@ class Populator(object):
         self.device_list = []
         self.format_list = []
 
-        self._fxml_iterate_master(xml_root[0])
-        #self._fxml_iterate_master(xml_root[1])
-        
+        self._fxml_get_basenames(xml_root[0], self.device_list)
+        self._fxml_get_basenames(xml_root[1], self.format_list)
 
-        for inc in self.device_list:
-            print (inc[0])
+        self._fxml_loop_trough(self.format_list, xml_root[1], "Format")
 
+        self._fxml_loop_trough(self.device_list, xml_root[0], "Optical")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "Disk")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "Partition")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "LVM")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "Raid")
 
+        #for inc in self.device_list:
+        #    print (inc[-1], "\n")
+
+    def _fxml_get_root(self, in_file):
+        """
+            This returns basic XML elements: Devices and Formats.
+            Returns: list of ET.Element
+        """
+        xml_root = ET.parse(in_file).getroot()
+        return [xml_root[0], xml_root[1]]
+
+################################################################################
+################# TOOL FUNCIONS ################################################
     def _fxml_parse_module(self, in_elem = None, in_text = None):
         """
             This function basically parses a name from fulltype element or any
@@ -1685,200 +1697,197 @@ class Populator(object):
         mod_name = str_parse_mod.split(".")[-1]
         return (imp_path[1:], mod_name)
 
-    def _fxml_attr_type_determ(self, in_elem):
-        """
-            This function decides what kind of value will be returned as well as
-            returns the value in certain type.
-        """
-        basic_types = {"str": str, "int": int, "float": float}
-        attr_type = basic_types.get(in_elem.attrib.get("type"))
-
-        if attr_type == None:
-            ## Checks for False / True
-            if in_elem.text == "True":
-                return True
-            elif in_elem.text == "False":
-                return False
-            ## Check for None
-            elif in_elem.text == "None":
-                return None
-            ## Check for complicated attribute - size
-            elif "size" in in_elem.attrib.get("attr"):
-                full_module = in_elem.attrib.get("type")
-                mod_path, mod_name = self._fxml_parse_module(None, full_module)
-                attr_value = getattr(importlib.import_module(mod_path), mod_name)()
-                attr_value.size = in_elem.text
-
-            ## If it fails, give it now just None
-            else:
-                attr_value = None
-        else:
-            attr_value = attr_type(in_elem.text)
-        return attr_value
-
-    def _fxml_parse_lists(self, in_elem):
-        """
-            This gets an element that contains subelements in the same structure as list.
-            It basically parses subelements into lists.
-        """
-        attr_list = []
-
-        for inc in in_elem:
-            attr_list.append(self._fxml_attr_type_determ(inc))
-        return attr_list
-
-    def _fxml_parse_parent_types(self, in_elem):
-        """
-            Gets and returns list of parents. It's basically same as fxml_get_lists,
-            but we need original, XML id, which is always integer
-        """
-        parent_list = []
-
-        for inc in in_elem:
-            parent_list.append(int(inc.text))
-            self._fxml_get_parents(parent_list)
-        return parent_list
-
-
-    def _fxml_parse_attributes(self, in_master_elem):
-        """
-            All basic attributes are gathered here. This parses "type" attribute,
-            stores it in variable that then sets the content of Element.text.
-        """
-        parent_typed_attrs = ["parents", "members", "ancestors"]
-        list_ignored_tags = ["fulltype", "Child_ID"]
-
-        for inc in in_master_elem:
-            if inc.tag in list_ignored_tags:
-                continue
-            elif inc.tag == "list" and inc.attrib.get("attr") not in parent_typed_attrs:
-                attr_value = self._fxml_parse_lists(inc)
-            elif inc.attrib.get("attr") in parent_typed_attrs:
-                attr_value = self._fxml_parse_parent_types(inc)
-            elif "level" in inc.attrib.get("attr"):
-                attr_value = inc.text
-            else:
-                attr_value = self._fxml_attr_type_determ(inc)
-
-            self.device_list[-1][1].update({inc.attrib.get("attr"): attr_value})
-
-    def _fxml_check_name(self, class_name):
-        """
-            This checks, if its any of advanced devices that require any basic
-            device to work (mainly members for MDRaid and LVM)
-        """
-        if type(class_name) != str:
-            return False
-        for inc in ["Partition", "Raid", "LVM", "BTRFS"]:
-            if inc in class_name:
-                return True
-        return False
-
 ################################################################################
-################################################################################
-################## Inits
-    def _fxml_init_stacks(self, forced_obj = None):
-        for inc in self.device_stack:
-            temp_str = self.device_list[inc - 1][0]
-            if forced_obj in temp_str:
-                self._fxml_init_class(inc - 1)
+################# GET FUNCIONS #################################################
+    def _fxml_get_parent_obj(self, in_par_list, in_list):
 
+        res_par_list = []
 
-    def _fxml_init_class(self, index):
-        """
-            This will init the class as well as point stack list to objects that
-            will be processed afterwards.
-        """
-        temp_obj_str = self.device_list[index][0]
-        temp_obj_dict = self.device_list[index][1]
-
-        if self._fxml_check_name(temp_obj_str) and index == -1:
-            dev_list_len = len(self.device_list)
-            self.device_stack.append(dev_list_len)
-
-        else:
-            mod_path, mod_name = self._fxml_parse_module(None, temp_obj_str)
-            temp_obj_name = temp_obj_dict.get("name")
-            #temp_obj.value = temp_obj_dict.get("size") + " B"
-            attr_dict = {}
-            ## Partition
-            if "Partition" in mod_name and index != -1:
-                temp_parent = temp_obj_dict.get("parents")
-                temp_sysfs_path = temp_obj_dict.get("sysfs_path")
-                temp_obj = getattr(importlib.import_module(mod_path), mod_name)(temp_obj_name, parents = temp_parent, sysfs_path = temp_sysfs_path)
-
-                ## Raid type
-            elif "Raid" in mod_name and index != -1:
-                temp_member = temp_obj_dict.get("members")
-                temp_level = temp_obj_dict.get("level")
-                temp_obj = getattr(importlib.import_module(mod_path), mod_name)(temp_obj_name, member_devices = temp_member, level = temp_level)
-
-            ## LVM
-            elif "LVM" in mod_name and index != -1:
-                temp_obj = None
-
-            ## BTRFS
-            elif "BTRFS" in mod_name and index != -1:
-                temp_parent = temp_obj_dict.get("parents")
-                #temp_obj = getattr(importlib.import_module(mod_path), mod_name)(temp_obj_name, parents = temp_parent)
-                temp_obj = None
-
-            ## Basic partition
-            else:
-                temp_obj = getattr(importlib.import_module(mod_path), mod_name)(temp_obj_name)
-            temp_tuple = (temp_obj, temp_obj_dict)
-            self.device_list[index] = temp_tuple
-################################################################################
-################################################################################
-##################### GET FUNCTIONS
-
-    def _fxml_get_parents(self, in_list):
-        for inc in self.device_list:
-            temp_obj = inc[0]
+        for inc in in_par_list:
+            temp_obj = inc[-1]
             temp_dict = inc[1]
-            if temp_dict.get("xml_id") in in_list and type(temp_obj) != str:
-                in_list_ind = in_list.index(temp_dict.get("xml_id"))
-                in_list[in_list_ind] = temp_obj
+            if temp_dict.get("xml_id") in in_list:
+                res_par_list.append(temp_obj)
+        return res_par_list
 
-    def _fxml_get_class_obj(self, in_elem):
+################################################################################
+################# PARSING FUNCIONS #############################################
+    def _fxml_parse_basic_list(self, in_elem_list):
         """
-            Based on _fxml_parse_module, this will create a object, but uninitialized.
-            Special cases are set too, but also its indexes are stored too into
-            stack.
+            This function gets an element that is a list. It loops trough it and
+            returns just list filled (or empty) with values that are subelements
         """
+        temp_list = []
 
-        mod_path, class_name = self._fxml_parse_module(in_elem[0])
-        name_bool = self._fxml_check_name(class_name)
+        for inc in in_elem_list:
+            if inc == None:
+                return temp_list
+            else:
+                tmp_val = in_elem_list.attrib.get("attr")
+                if tmp_val == "parents" or tmp_val == "members":
+                    temp_list.append(int(inc.text))
+                else:
+                    temp_list.append(self._fxml_parse_value(inc))
+        return temp_list
 
-        if name_bool == True:
-            self.device_stack.append(len(self.device_list))
-        return getattr(importlib.import_module(mod_path), class_name)
+    def _fxml_parse_value(self, in_elem, in_list = None, index = None):
+        """
+            Gets the data out of attr="" and <tag>VALUE</tag>. It basically determines
+            if its a basic typed value or complex value.
+        """
+        ## Define basic types
+        basic_types = {"str": str, "int": int, "float": float}
+        basic_values = {"True": True, "False": False}
 
-    def _fxml_iterate_master(self, in_elems):
-        """
-            This basically gets all objects from XML and sets them. It does not
-            initiate them, just prepares them to be initiated. Special cases like
-            RAID, BTRFS and LVM are stored too. See _fxml_get_class_obj() for details
-        """
-        ## Iterate trough elems
-        for inc in in_elems:
-            self.device_list.append((inc[0].text, {}))
-            self.device_list[-1][1].update({"name": inc.attrib.get("name")})
-            self.device_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
-            #self._fxml_parse_attributes(inc)
-            #self._fxml_init_class(-1)
+        ## Define advanced attributes like parents, we want to skip them at the beginning
+        par_typed_attrs = ["parents", "ancestors", "members"]
 
+        ## Try to get everything possible
+        attr_value = in_elem.attrib.get("type")
+        attr_type = basic_types.get(attr_value)
 
-    def _fxml_get_root(self, in_file):
+        ## If its basic type like str and so on
+        if attr_type != None:
+            return attr_type(in_elem.text)
+
+        ## Like above, but for element value
+        elif basic_values.get(in_elem.text) != None:
+            return basic_values.get(in_elem.text)
+
+        ## Get basic lists
+        elif in_elem.tag == "list" and in_elem.attrib.get("attr") not in par_typed_attrs:
+            return self._fxml_parse_basic_list(in_elem)
+
+        elif in_elem.attrib.get("attr") == "members":
+            tmp_value = self._fxml_parse_basic_list(in_elem)
+            tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
+            return tmp_list
+
+        ## If complicated attribute
+        elif "." in attr_value:
+            mod_path, mod_name = self._fxml_parse_module(None, attr_value)
+
+            ## Check for size
+            if "Size" in mod_name:
+                tmp_value = int(in_elem.text)
+                return getattr(importlib.import_module(mod_path), mod_name)(value = tmp_value)
+            ## Is it a ParentList => list?
+            elif "ParentList" in mod_name:
+                tmp_value = self._fxml_parse_basic_list(in_elem)
+                tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
+                return tmp_list
+            ## RAID levels
+            elif "RAID" in mod_name:
+                return str(in_elem.text)
+
+            else:
+                tmp_value = None
+                return getattr(importlib.import_module(mod_path), mod_name)
+
+        ## If everything fails, give nothing
+        else:
+            return None
+
+    def _fxml_parse_attrs(self, in_master_list, in_elem, index):
         """
-            This returns basic XML elements: Devices and Formats.
-            Returns: list of ET.Element
+            This basically walks trough element tree and updates dictionary with
+            attributes.
         """
-        xml_root = ET.parse(in_file).getroot()
-        return [xml_root[0], xml_root[1]]
+        ## Firstly, define what we want to skip for first time
+        ignored_attrs = ["fulltype"]
+
+        for inc in in_elem:
+            ## Dissasemble tuple into simpler objects
+            temp_obj_str = in_master_list[index][0]
+            temp_dict = in_master_list[index][1]
+            ## Ignore certain attributes
+            if inc.tag in ignored_attrs:
+                continue
+            elif inc.attrib.get("attr") == "format":
+                attr_value = self.format_list[index][-1]
+            else:
+                attr_value = self._fxml_parse_value(inc, in_master_list, index)
+            temp_dict.update({inc.attrib.get("attr"): attr_value})
+
+            ## Reassemble afterwards
+            in_master_list[index] = (temp_obj_str, temp_dict)
+################################################################################
+################# INIT FUNCIONS ################################################
+    def _fxml_set_attrs(self, in_obj, in_dict):
+        for inc in in_dict:
+            try:
+                setattr(in_obj, inc, in_dict.get(inc))
+            except Exception as e:
+                pass
+
+    def _fxml_init_class(self, in_master_list, list_index, forced_obj):
+        """
+            This finally intializes class object
+        """
+        temp_obj_str = in_master_list[list_index][0]
+        temp_obj_dict = in_master_list[list_index][1]
+        mod_path, mod_name = self._fxml_parse_module(None, temp_obj_str)
+
+        ## Get name, because its general for all
+        obj_name = temp_obj_dict.get("name")
+        obj_uuid = temp_obj_dict.get("uuid")
+
+        if forced_obj == "Format":
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)()
+        elif forced_obj == "Disk" or forced_obj == "Optical":
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name)
+        elif forced_obj == "Partition":
+            temp_parent = temp_obj_dict.get("parents")
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, parents=temp_parent)
+        elif forced_obj == "LVM":
+            temp_parent = temp_obj_dict.get("parents")
+            temp_format = temp_obj_dict.get("format")
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent)
+        elif forced_obj == "Raid":
+            temp_member = temp_obj_dict.get("members")
+            temp_level = temp_obj_dict.get("level")
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_member, level=temp_level)
+        else:
+            pass
+
+        self._fxml_set_attrs(temp_obj, temp_obj_dict)
+        in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+        if forced_obj != "Format":
+            self.devicetree._add_device(temp_obj)
+
+################################################################################
+################# BASIC LOOP FUNCIONS ##########################################
+    def _fxml_loop_trough(self, in_master_list, in_master_elem, forced_obj):
+        """
+            This function does the hard work - decides upon forced_obj to get
+            specific object from in_master_list to set attributes on.
+        """
+        counter = 0
+        for inc in in_master_list:
+            ## "disassemble" object into simpler, get name in this instance
+            temp_name = inc[0]
+            temp_dict = inc[1]
+            if forced_obj in temp_name.split(".")[-1] or forced_obj == "Format":
+                list_index = in_master_list.index(inc)
+                self._fxml_parse_attrs(in_master_list, in_master_elem[list_index], list_index)
+                self._fxml_init_class(in_master_list, list_index, forced_obj)
+            else:
+                continue
+
+            counter += 1
+
+    def _fxml_get_basenames(self, in_master_elem, in_master_list):
+        """
+            This function will get basic names of the elements. This name can be
+            parsed into modules.
+        """
+        for inc in in_master_elem:
+            in_master_list.append((inc[0].text, {}))
+            in_master_list[-1][1].update({"name": inc.attrib.get("name")})
+            in_master_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
 ################################################################################
 ################################################################################
-################################################################################
+
     def _populate(self):
         log.info("DeviceTree.populate: ignored_disks is %s ; exclusive_disks is %s",
                  self.ignored_disks, self.exclusive_disks)
