@@ -1663,7 +1663,9 @@ class Populator(object):
         self._fxml_loop_trough(self.device_list, xml_root[0], "Optical")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Disk")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Partition")
-        self._fxml_loop_trough(self.device_list, xml_root[0], "LVM")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "LVMVolume")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "LVMLogical")
+        self._fxml_loop_trough(self.device_list, xml_root[0], "BTRFS")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Raid")
 
         #for inc in self.device_list:
@@ -1763,6 +1765,11 @@ class Populator(object):
             tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
             return tmp_list
 
+        elif "ancestors" in in_elem.attrib.get("attr"):
+            tmp_value = self._fxml_parse_basic_list(in_elem)
+            tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
+            return tmp_list
+
         ## If complicated attribute
         elif "." in attr_value:
             mod_path, mod_name = self._fxml_parse_module(None, attr_value)
@@ -1813,13 +1820,6 @@ class Populator(object):
             in_master_list[index] = (temp_obj_str, temp_dict)
 ################################################################################
 ################# INIT FUNCIONS ################################################
-    def _fxml_set_attrs(self, in_obj, in_dict):
-        for inc in in_dict:
-            try:
-                setattr(in_obj, inc, in_dict.get(inc))
-            except Exception as e:
-                pass
-
     def _fxml_init_class(self, in_master_list, list_index, forced_obj):
         """
             This finally intializes class object
@@ -1831,6 +1831,7 @@ class Populator(object):
         ## Get name, because its general for all
         obj_name = temp_obj_dict.get("name")
         obj_uuid = temp_obj_dict.get("uuid")
+        obj_size = temp_obj_dict.get("size")
 
         if forced_obj == "Format":
             temp_obj = getattr(importlib.import_module(mod_path), mod_name)()
@@ -1838,19 +1839,28 @@ class Populator(object):
             temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name)
         elif forced_obj == "Partition":
             temp_parent = temp_obj_dict.get("parents")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, parents=temp_parent)
-        elif forced_obj == "LVM":
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, parents=temp_parent, size=obj_size)
+        elif forced_obj == "LVMVolume":
             temp_parent = temp_obj_dict.get("parents")
             temp_format = temp_obj_dict.get("format")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent)
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
+        elif forced_obj == "LVMLogical":
+            temp_parent = temp_obj_dict.get("parents")
+            temp_format = temp_obj_dict.get("format")
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
+        elif forced_obj == "BTRFS":
+            temp_parent = temp_obj_dict.get("parents")
+            temp_format = temp_obj_dict.get("format")
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
         elif forced_obj == "Raid":
             temp_member = temp_obj_dict.get("members")
             temp_level = temp_obj_dict.get("level")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_member, level=temp_level)
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_member, level=temp_level, size=obj_size)
         else:
             pass
 
-        self._fxml_set_attrs(temp_obj, temp_obj_dict)
+        if hasattr(temp_obj, "_fxml_set_attrs"):
+            temp_obj._fxml_set_attrs(temp_obj_dict)
         in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
         if forced_obj != "Format":
             self.devicetree._add_device(temp_obj)

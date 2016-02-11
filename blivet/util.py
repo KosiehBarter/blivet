@@ -624,6 +624,20 @@ class ObjectID(object):
         self.id = self._newid_gen()  # pylint: disable=attribute-defined-outside-init
         return self
 
+    def _fxml_set_attrs(self, in_dict):
+        """
+            This will fill a object with attributes that
+        """
+        ignored_attrs = ["name", "xml_id"]
+        for inc in in_dict:
+            try:
+                if inc not in ignored_attrs:
+                    setattr(self, inc, in_dict.get(inc))
+                else:
+                    continue
+            except Exception as e:
+                pass
+
     def to_xml(self, **kwargs):
         """
             Export data to XML format and then return them to the caller.
