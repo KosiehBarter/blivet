@@ -57,6 +57,7 @@ from .flags import flags
 from .storage_log import log_exception_info, log_method_call
 from .i18n import _
 from .size import Size
+from inspect import getargspec, getfullargspec
 
 import logging
 log = logging.getLogger("blivet")
@@ -1830,40 +1831,15 @@ class Populator(object):
 
         ## Get name, because its general for all
         obj_name = temp_obj_dict.get("name")
-        obj_uuid = temp_obj_dict.get("uuid")
-        obj_size = temp_obj_dict.get("size")
+        obj_arg_dict = {}
 
+        arg_list = getfullargspec(getattr(importlib.import_module(mod_path), mod_name).__init__)[0][2:]
         if forced_obj == "Format":
             temp_obj = getattr(importlib.import_module(mod_path), mod_name)()
-        elif forced_obj == "Disk" or forced_obj == "Optical":
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name)
-        elif forced_obj == "Partition":
-            temp_parent = temp_obj_dict.get("parents")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, parents=temp_parent, size=obj_size)
-        elif forced_obj == "LVMVolume":
-            temp_parent = temp_obj_dict.get("parents")
-            temp_format = temp_obj_dict.get("format")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
-        elif forced_obj == "LVMLogical":
-            temp_parent = temp_obj_dict.get("parents")
-            temp_format = temp_obj_dict.get("format")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
-        elif forced_obj == "BTRFS":
-            temp_parent = temp_obj_dict.get("parents")
-            temp_format = temp_obj_dict.get("format")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_parent, size=obj_size)
-        elif forced_obj == "Raid":
-            temp_member = temp_obj_dict.get("members")
-            temp_level = temp_obj_dict.get("level")
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, uuid=obj_uuid, parents=temp_member, level=temp_level, size=obj_size)
         else:
             pass
 
-        if hasattr(temp_obj, "_fxml_set_attrs"):
-            temp_obj._fxml_set_attrs(temp_obj_dict)
-        in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
-        if forced_obj != "Format":
-            self.devicetree._add_device(temp_obj)
+
 
 ################################################################################
 ################# BASIC LOOP FUNCIONS ##########################################
