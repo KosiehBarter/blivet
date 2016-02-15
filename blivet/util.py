@@ -715,6 +715,14 @@ class ObjectID(object):
                 xml_sublist.append(ET.SubElement(parent_elem, "tuple", {"attr": str(inc), "type": str(tuple).split("'")[1]}))
                 self._to_xml_parse_tuple(getattr(self, inc), xml_sublist[-1])
 
+            elif inc == "parted_partition":
+                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "start", "type": "int"}))
+                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.start"))
+                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "end", "type": "int"}))
+                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.end"))
+                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "length", "type": "int"}))
+                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.length"))
+
             elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
                 xml_parse_id = int(self._getdeepattr(self, str(inc) + ".id"))
@@ -726,12 +734,12 @@ class ObjectID(object):
                     format_elems.append(ET.SubElement(super_elems[1], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"id": str(self._getdeepattr(self, str(inc) + ".id")), "name": str(self._getdeepattr(self, str(inc) + ".name"))})) # Adds a format root elem.
                     getattr(self, inc).to_xml(parent_elem = format_elems[-1], format_list = format_list, device_ids = device_ids, parted_elems = parted_elems, super_elems = super_elems, parted_list = parted_list)
 
-            elif "parted." in str(type(getattr(self, inc))) and (str(type(getattr(self, inc))).split("'")[1], format_list[-1]) not in parted_list:
+            elif "parted." in str(type(getattr(self, inc))) and (str(type(getattr(self, inc))).split("'")[1], format_list[-1]) not in parted_list and getattr(self, inc) != "parted_partition":
                 parted_list.append((str(type(getattr(self, inc))).split("'")[1], format_list[-1]))
                 parted_elems.append(ET.SubElement(super_elems[2], str(type(getattr(self, inc))).split("'")[1].split(".")[-1], {"format_id": str(format_list[-1])}))
                 self._to_xml_parse_parted(parted_elems[-1], format_list[-1], getattr(self, inc))
 
-            elif "parted." in str(type(getattr(self, inc))):
+            elif "parted." in str(type(getattr(self, inc))) and getattr(self, inc) != "parted_partition":
                 continue
 
             else:
@@ -745,7 +753,7 @@ class ObjectID(object):
 
     def _to_xml_check_attrs(self, in_attr):
 
-        for inc in ["_abc_", "sync", "dict", "mount", "parted_partition", "name", "_newid_gen", "_levels", "_newid_func", "primary_partitions", "_plugin", "_info_class", "_resize", "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info"]:
+        for inc in ["_abc_", "sync", "dict", "mount", "name", "_newid_gen", "_levels", "_newid_func", "primary_partitions", "_plugin", "_info_class", "_resize", "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info"]:
             if inc in in_attr:
                 return True
         return False
@@ -766,8 +774,7 @@ class ObjectID(object):
 
         allowed_attrs = ["type", "lastPartitionNumber", "maxPartitionLength", "maxPartitionStartSector", "maxPrimaryPartitionCount", "maxSupportedPartitionCount", "primaryPartitionCount",
                          "biosGeometry", "bootDirty", "busy", "did", "dirty", "externalMode", "hardwareGeometry", "host", "length", "model", "openCount", "path", "physicalSectorSize",
-                         "readOnly", "sectorSize", "grainSize", "offset", "fileSystem", "active", "name", "number", "_abc_negative_cache_version",
-                         "invalid"]
+                         "readOnly", "sectorSize", "grainSize", "offset", "fileSystem", "active", "name", "number", "_abc_negative_cache_version", "invalid"]
 
         for inc in allowed_attrs:
             try:
