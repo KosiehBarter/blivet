@@ -1661,6 +1661,10 @@ class Populator(object):
 
         self._fxml_loop_trough(self.format_list, xml_root[1], "Format")
 
+        self.name_list = []
+        self._basename_iterator()
+        print (self.name_list)
+
         self._fxml_loop_trough(self.device_list, xml_root[0], "Optical")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Disk")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Partition")
@@ -1669,8 +1673,10 @@ class Populator(object):
         self._fxml_loop_trough(self.device_list, xml_root[0], "BTRFS")
         self._fxml_loop_trough(self.device_list, xml_root[0], "Raid")
 
-        #for inc in self.device_list:
-        #    print (inc[-1], "\n")
+    def _basename_iterator(self):
+        for inc in self.device_list:
+            self.name_list.append(inc[0].split(".")[-1])
+
 
     def _fxml_get_root(self, in_file):
         """
@@ -1833,14 +1839,15 @@ class Populator(object):
                 else:
                     obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
 
+            ## Finally, Init it
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, **obj_arg_dict)
+            self.devicetree._add_device(temp_obj)
+
         else:
             log.error(temp_obj_str + " not implemented")
             pass
+            temp_obj = None # Tempowary
 
-        ## Finally, Init it
-        temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, **obj_arg_dict)
-        if forced_obj != "Format":
-            self.devicetree._add_device(temp_obj)
         in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
 
 ################################################################################
