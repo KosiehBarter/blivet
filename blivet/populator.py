@@ -1739,62 +1739,44 @@ class Populator(object):
             if its a basic typed value or complex value.
         """
         ## Define basic types
-        basic_types = {"str": str, "int": int, "float": float}
-        basic_values = {"True": True, "False": False}
+        basic_types = {"int": int, "float": float} ## Note: str missing intentionally, parsed by default.
+        basic_values = {"True": True, "False": False, "None": None}
 
         ## Define advanced attributes like parents, we want to skip them at the beginning
         par_typed_attrs = ["parents", "ancestors", "members"]
 
-        ## Try to get everything possible
-        attr_value = in_elem.attrib.get("type")
-        attr_type = basic_types.get(attr_value)
+        tmp_attr_type = in_elem.attrib.get("type")
 
-        ## If its basic type like str and so on
-        if attr_type != None:
-            return attr_type(in_elem.text)
+        ## Parse string by default
+        if tmp_attr_type == "str":
+            res_value = in_elem.text
 
-        ## Like above, but for element value
-        elif basic_values.get(in_elem.text) != None:
-            return basic_values.get(in_elem.text)
+        ## Parse ints and floats
+        elif tmp_attr_type in basic_types.keys():
+            res_value = basic_types.get(tmp_attr_type)(in_elem.text)
 
-        ## Get basic lists
-        elif in_elem.tag == "list" and in_elem.attrib.get("attr") not in par_typed_attrs:
-            return self._fxml_parse_basic_list(in_elem)
+        else:
+            ## Parse "static" values
+            if in_elem.text in basic_values.keys():
+                res_value = basic_values.get(in_elem.text)
 
-        elif in_elem.attrib.get("attr") == "members":
-            tmp_value = self._fxml_parse_basic_list(in_elem)
-            tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
-            return tmp_list
+            elif "list" in in_elem.tag and in_elem.attrib.get("attr") not in par_typed_attrs:
+                res_value = self._fxml_parse_basic_list(in_elem)
+            ## Complicated types, Size first
+            elif "." in tmp_attr_type and "Size" in tmp_attr_type:
+                mod_path, mod_name = self._fxml_parse_module(None, tmp_attr_type)
+                res_value = getattr(importlib.import_module(mod_path), mod_name)(value = int(in_elem.text))
 
-        elif "ancestors" in in_elem.attrib.get("attr"):
-            tmp_value = self._fxml_parse_basic_list(in_elem)
-            tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
-            return tmp_list
-
-        ## If complicated attribute
-        elif "." in attr_value:
-            mod_path, mod_name = self._fxml_parse_module(None, attr_value)
-
-            ## Check for size
-            if "Size" in mod_name:
-                tmp_value = int(in_elem.text)
-                return getattr(importlib.import_module(mod_path), mod_name)(value = tmp_value)
-            ## Is it a ParentList => list?
-            elif "ParentList" in mod_name:
-                tmp_value = self._fxml_parse_basic_list(in_elem)
-                tmp_list = self._fxml_get_parent_obj(in_list, tmp_value)
-                return tmp_list
-            ## RAID levels
-            elif "RAID" in mod_name:
-                return str(in_elem.text)
+            ## ParentList
+            elif "." in tmp_attr_type and "ParentList" in tmp_attr_type:
+                mod_path, mod_name = self._fxml_parse_module(None, tmp_attr_type)
+                res_value = self._fxml_parse_basic_list(in_elem)
+                res_value = self._fxml_get_parent_obj(in_list, res_value)
 
             else:
-                tmp_value = None
-                return getattr(importlib.import_module(mod_path), mod_name)
+                res_value = None
 
-        ## If everything fails, give nothing
-        else:
-            return None
+        return res_value
 
     def _fxml_parse_attrs(self, in_master_list, in_elem, index):
         """
@@ -1835,11 +1817,31 @@ class Populator(object):
 
         arg_list = getfullargspec(getattr(importlib.import_module(mod_path), mod_name).__init__)[0][2:]
         if forced_obj == "Format":
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)()
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(exists = True, options = temp_obj_dict.get("options"), uuid = temp_obj_dict.get("uuid"), create_options = temp_obj_dict.get("create_options"))
+            in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+
+        elif forced_obj == "Disk":
+            for inc in arg_list:
+                if inc == "fmt":
+                    obj_arg_dict.update({"fmt": self.format_list[list_index][-1]})
+                elif inc == "maxsize":
+                    obj_arg_dict.update({inc: temp_obj_dict.get("max_size")})
+                elif inc == "grow":
+                    obj_arg_dict.update({inc: temp_obj_dict.get("growable")})
+                elif inc == "primary":
+                    obj_arg_dict.update({inc: temp_obj_dict.get("is_primary")})
+                else:
+                    obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
+
         else:
+            log.error(temp_obj_str + " not implemented")
             pass
 
-
+        ## Finally, Init it
+        temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, **obj_arg_dict)
+        if forced_obj != "Format":
+            self.devicetree._add_device(temp_obj)
+        in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
 
 ################################################################################
 ################# BASIC LOOP FUNCIONS ##########################################
