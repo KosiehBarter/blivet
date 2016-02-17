@@ -1824,7 +1824,7 @@ class Populator(object):
 
         arg_list = getfullargspec(getattr(importlib.import_module(mod_path), mod_name).__init__)[0][2:]
         if forced_obj == "Format":
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(exists = True, options = temp_obj_dict.get("options"), uuid = temp_obj_dict.get("uuid"), create_options = temp_obj_dict.get("create_options"))
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(exists = False, options = temp_obj_dict.get("options"), uuid = temp_obj_dict.get("uuid"), create_options = temp_obj_dict.get("create_options"))
             in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
 
         elif "BTRFS" in forced_obj:
@@ -1842,6 +1842,8 @@ class Populator(object):
                     obj_arg_dict.update({inc: temp_obj_dict.get("growable")})
                 elif inc == "primary":
                     obj_arg_dict.update({inc: temp_obj_dict.get("is_primary")})
+                elif inc == "exists":
+                    obj_arg_dict.update({"exists": False})
                 else:
                     obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
 
