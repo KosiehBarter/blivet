@@ -624,12 +624,13 @@ class ObjectID(object):
         self.id = self._newid_gen()  # pylint: disable=attribute-defined-outside-init
         return self
 
-    def _fxml_set_attrs(self, in_dict):
+    def _fxml_set_attrs(self, in_dict, in_list):
         """
-            This will fill a object with attributes that
+            This will fill a object with attributes
         """
-        ignored_attrs = ["name", "xml_id"]
+        ignored_attrs = ["name", "xml_id", "format"] + in_list
         for inc in in_dict:
+            pass
             try:
                 if inc not in ignored_attrs:
                     setattr(self, inc, in_dict.get(inc))
