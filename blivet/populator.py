@@ -1664,15 +1664,14 @@ class Populator(object):
         self._fxml_loop_trough(self.format_list, xml_root[1], "Format")
 
         for inc in range(len(self.name_list)):
-            if inc < 2:
-                self._fxml_loop_trough(self.device_list, xml_root[0], self.name_list[inc])
+            self._fxml_loop_trough(self.device_list, xml_root[0], self.name_list[inc])
 
 
 
     def _basename_iterator(self):
         for inc in self.device_list:
-            self.name_list.append(inc[0].split(".")[-1])
-
+            if inc[0].split(".")[-1] not in self.name_list:
+                self.name_list.append(inc[0].split(".")[-1])
 
     def _fxml_get_root(self, in_file):
         """
@@ -1762,15 +1761,21 @@ class Populator(object):
             if in_elem.text in basic_values.keys():
                 res_value = basic_values.get(in_elem.text)
 
+            ## Basic list
             elif "list" in in_elem.tag and in_elem.attrib.get("attr") not in par_typed_attrs:
                 res_value = self._fxml_parse_basic_list(in_elem)
+
+            ## RAID levels. We want them as strings.
+            elif in_elem.attrib.get("attr") == "level":
+                res_value = in_elem.text
+
             ## Complicated types, Size first
             elif "." in tmp_attr_type and "Size" in tmp_attr_type:
                 mod_path, mod_name = self._fxml_parse_module(None, tmp_attr_type)
                 res_value = getattr(importlib.import_module(mod_path), mod_name)(value = int(in_elem.text))
 
             ## ParentList
-            elif "." in tmp_attr_type and "ParentList" in tmp_attr_type:
+            elif "." in tmp_attr_type and "ParentList" in tmp_attr_type or in_elem.attrib.get("attr") in par_typed_attrs[1:]:
                 mod_path, mod_name = self._fxml_parse_module(None, tmp_attr_type)
                 res_value = self._fxml_parse_basic_list(in_elem)
                 res_value = self._fxml_get_parent_obj(in_list, res_value)
@@ -1820,6 +1825,11 @@ class Populator(object):
         arg_list = getfullargspec(getattr(importlib.import_module(mod_path), mod_name).__init__)[0][2:]
         if forced_obj == "Format":
             temp_obj = getattr(importlib.import_module(mod_path), mod_name)(exists = True, options = temp_obj_dict.get("options"), uuid = temp_obj_dict.get("uuid"), create_options = temp_obj_dict.get("create_options"))
+            in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+
+        elif "BTRFS" in forced_obj:
+            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(parents = temp_obj_dict.get("parents"))
+            self.devicetree._add_device(temp_obj)
             in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
 
         else:
