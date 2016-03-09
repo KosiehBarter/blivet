@@ -170,17 +170,14 @@ class PartitionDevice(StorageDevice):
             ## Convert parted_partition to self.attributes
                 self.start = self._parted_partition.geometry.start
                 self.end = self._parted_partition.geometry.end
-                self.length = self.end - self.start
+                self.length = self.end + 1 - self.start
                 self._part_type = self._parted_partition.type
 
                 if not self._parted_partition:
                     raise errors.DeviceError("cannot find parted partition instance", self.name)
 
             else:
-                self.start = start
-                self.end = end
-                self.length = self.end - self.start
-                self.xml_import = True
+                self.length = self.end + 1 - self.start
 
             self._orig_path = self.path
             # collect information about the partition from parted
@@ -556,9 +553,7 @@ class PartitionDevice(StorageDevice):
             self._size = Size(self.parted_partition.getLength(unit="B"))
             self._part_type = self.parted_partition.type
             self._bootable = self.get_flag(parted.PARTITION_BOOT)
-        else:
-            self._size = Size(self.length)
-            self._bootable = self.get_flag(parted.PARTITION_BOOT)
+            #self._bootable = self.get_flag(parted.PARTITION_BOOT)
 
 
     def _wipe(self):
