@@ -628,11 +628,11 @@ class ObjectID(object):
         """
             This will fill a object with attributes
         """
-        ignored_attrs = ["name", "xml_id", "format"] + in_list
+        ignored_attrs = set(["name", "xml_id", "format"] + in_list)
         for inc in in_dict:
             pass
             try:
-                if inc not in ignored_attrs:
+                if inc not in ignored_attrs :
                     setattr(self, inc, in_dict.get(inc))
                 else:
                     continue
@@ -715,14 +715,6 @@ class ObjectID(object):
             elif type(getattr(self, inc)) == tuple:
                 xml_sublist.append(ET.SubElement(parent_elem, "tuple", {"attr": str(inc), "type": str(tuple).split("'")[1]}))
                 self._to_xml_parse_tuple(getattr(self, inc), xml_sublist[-1])
-
-            elif inc == "parted_partition":
-                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "start", "type": "int"}))
-                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.start"))
-                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "end", "type": "int"}))
-                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.end"))
-                xml_sublist.append(ET.SubElement(parent_elem, "prop", {"attr": "length", "type": "int"}))
-                xml_sublist[-1].text = str(self._getdeepattr(self, "parted_partition.geometry.length"))
 
             elif hasattr(getattr(self, inc), "to_xml") and self._hasdeepattr(self, str(inc) + ".id"):
                 ## A simple check - use stack data structure with tuple to check if the elem was set or not
