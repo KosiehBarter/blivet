@@ -1822,15 +1822,24 @@ class Populator(object):
         obj_name = temp_obj_dict.get("name")
         obj_arg_dict = {}
 
-        arg_list = getfullargspec(getattr(importlib.import_module(mod_path), mod_name).__init__)[0][2:]
+        arg_list = getfullargspec(getattr(importlib.import_module(mod_path),
+                                          mod_name).__init__)[0][2:]
         if forced_obj == "Format":
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(exists = temp_obj_dict.get("exists"), options = temp_obj_dict.get("options"), uuid = temp_obj_dict.get("uuid"), create_options = temp_obj_dict.get("create_options"))
+            temp_obj = getattr(importlib.import_module(mod_path),
+                               mod_name)(exists = temp_obj_dict.get("exists"),
+                                         options = temp_obj_dict.get("options"),
+                                         uuid = temp_obj_dict.get("uuid"),
+                                         create_options = temp_obj_dict.get("create_options"))
             in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
 
         elif "BTRFS" in forced_obj:
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(parents = temp_obj_dict.get("parents"), exists = temp_obj_dict.get("exists"))
+            temp_obj = getattr(importlib.import_module(mod_path),
+                               mod_name)(parents = temp_obj_dict.get("parents"),
+                                         exists = temp_obj_dict.get("exists"))
             self.devicetree._add_device(temp_obj)
-            in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+            in_master_list[list_index] = (temp_obj_str,
+                                          temp_obj_dict,
+                                          temp_obj)
 
         else:
             for inc in arg_list:
@@ -1848,7 +1857,8 @@ class Populator(object):
                     obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
 
             ## Finally, Init it
-            temp_obj = getattr(importlib.import_module(mod_path), mod_name)(obj_name, **obj_arg_dict)
+            temp_obj = getattr(importlib.import_module(mod_path),
+                               mod_name)(obj_name, **obj_arg_dict)
             if hasattr(temp_obj, "_fxml_set_attrs"):
                 temp_obj._fxml_set_attrs(temp_obj_dict, arg_list)
             self.devicetree._add_device(temp_obj)
