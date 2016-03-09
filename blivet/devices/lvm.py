@@ -87,7 +87,7 @@ class LVMVolumeGroupDevice(ContainerDevice):
 
     def __init__(self, name, parents=None, size=None, free=None,
                  pe_size=None, pe_count=None, pe_free=None, pv_count=None,
-                 uuid=None, exists=False, sysfs_path=''):
+                 uuid=None, exists=False, sysfs_path='', xml_import=False, path=None):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -126,7 +126,8 @@ class LVMVolumeGroupDevice(ContainerDevice):
 
         super(LVMVolumeGroupDevice, self).__init__(name, parents=parents,
                                                    uuid=uuid, size=size,
-                                                   exists=exists, sysfs_path=sysfs_path)
+                                                   exists=exists, sysfs_path=sysfs_path,
+                                                   xml_import = xml_import, in_path = path)
 
         self.free = util.numeric_type(free)
         self.pe_size = util.numeric_type(pe_size)
@@ -134,6 +135,9 @@ class LVMVolumeGroupDevice(ContainerDevice):
         self.pe_free = util.numeric_type(pe_free)
         self._reserved_percent = 0
         self._reserved_space = Size(0)
+
+        # Special bool for XML import
+        self.xml_import = xml_import
 
         # TODO: validate pe_size if given
         if not self.pe_size:
@@ -164,7 +168,6 @@ class LVMVolumeGroupDevice(ContainerDevice):
                "pvs": pprint.pformat([str(p) for p in self.pvs]),
                "lvs": pprint.pformat([str(l) for l in self.lvs])})
         return s
-
     @property
     def dict(self):
         d = super(LVMVolumeGroupDevice, self).dict

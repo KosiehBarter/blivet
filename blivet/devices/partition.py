@@ -70,7 +70,7 @@ class PartitionDevice(StorageDevice):
                  size=None, grow=False, maxsize=None, start=None, end=None,
                  major=None, minor=None, bootable=None,
                  sysfs_path='', parents=None, exists=False,
-                 part_type=None, primary=False, weight=0):
+                 part_type=None, primary=False, weight=0, xml_import = False):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -127,6 +127,13 @@ class PartitionDevice(StorageDevice):
         self.req_start_sector = None
         self.req_end_sector = None
         self.req_name = None
+        self.xml_import = xml_import
+
+        # Parted_partition variables converted to PartitionDevice
+        self.start = None
+        self.end = None
+        self.length = None
+        #self.
 
         self._bootable = False
 
@@ -155,9 +162,15 @@ class PartitionDevice(StorageDevice):
         #        For existing partitions we will get the size from
         #        parted.
 
-        if self.exists and not flags.testing:
+        if self.exists and not flags.testing and not self.xml_import:
             log.debug("looking up parted Partition: %s", self.path)
             self._parted_partition = self.disk.format.parted_disk.getPartitionByPath(self.path)
+
+            ## Convert parted_partition to self.attributes
+            self.start = self.disk.format.parted_disk.getPartitionByPath(self.path).geometry.start
+            self.end = self.disk.format.parted_disk.getPartitionByPath(self.path).geometry.end
+            self.length = self.end - self.start
+
             if not self._parted_partition:
                 raise errors.DeviceError("cannot find parted partition instance", self.name)
 
@@ -172,6 +185,10 @@ class PartitionDevice(StorageDevice):
                 # the only way to identify a BIOS Boot partition is to
                 # check the partition type/flags, so do it here.
                 self.format = get_format("biosboot", device=self.path, exists=True)
+        elif self.exists and not flags.testing and self.xml_import:
+            self.start = start
+            self.end = end
+            self.length = end - start
         else:
             # XXX It might be worthwhile to create a shit-simple
             #     PartitionRequest class and pass one to this constructor

@@ -1844,6 +1844,8 @@ class Populator(object):
                     obj_arg_dict.update({inc: temp_obj_dict.get("is_primary")})
                 elif inc == "exists":
                     obj_arg_dict.update({"exists": False})
+                elif inc == "xml_import":
+                    obj_arg_dict.update({"xml_import": True})
                 else:
                     obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
 
