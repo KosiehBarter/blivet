@@ -167,7 +167,7 @@ class Blivet(object):
         self.services = set()
         self._free_space_snapshot = None
 
-    def to_xml(self, **kwargs):
+    def to_xml(self, dump_device=None, custom_name=None, rec_bool=False):
         """
             This is the master to_xml() function. It basically gathers the data and
             performs parsing to XML notation on its children.
@@ -181,11 +181,6 @@ class Blivet(object):
             param str custom_name: custom name supplied by the user
             param bool rec_bool: NOTE: Must be used with dump_device: decide if to dump recursively or not
         """
-        # Parse args
-        dump_device = kwargs.get("dump_device")
-        custom_name = kwargs.get("custom_name")
-        rec_bool = kwargs.get("rec_bool")
-
         # Declare master element and list of elems
         master_root_elem = ET.Element("Blivet-XML-Tools")
 
@@ -196,7 +191,6 @@ class Blivet(object):
 
         list_of_formats = [] # This helps in util.py to determine if to gather multiple formats or not
         list_of_devices = [] # Same function as list_of_formats
-        list_of_parted = [] # Same as above
 
         input_list = []
 
@@ -229,12 +223,19 @@ class Blivet(object):
 
         super_elems.append(ET.SubElement(master_root_elem, "Devices"))
         super_elems.append(ET.SubElement(master_root_elem, "Formats"))
-        super_elems.append(ET.SubElement(master_root_elem, "Parted_Objects"))
 
         for inc in input_list:
             if hasattr(inc, "to_xml"):
-                disk_elems.append(ET.SubElement(super_elems[0], str(type(inc)).split("'")[1].split(".")[-1], {"id": str(getattr(inc, "id")), "name": str(getattr(inc, "name"))}))
-                inc.to_xml(parent_elem = disk_elems[-1], root_elem = master_root_elem, super_elems = super_elems, format_elems = format_elems, format_list = list_of_formats, device_ids = list_of_devices, parted_elems = parted_elems, parted_list = list_of_parted)
+                disk_elems.append(ET.SubElement(super_elems[0],
+                                                str(type(inc)).split("'")[1].split(".")[-1],
+                                                {"id": str(getattr(inc, "id")),
+                                                "name": str(getattr(inc, "name"))}))
+                inc.to_xml(parent_elem = disk_elems[-1],
+                           root_elem = master_root_elem,
+                           super_elems = super_elems,
+                           format_elems = format_elems,
+                           format_list = list_of_formats,
+                           device_ids = list_of_devices)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
@@ -278,30 +279,6 @@ class Blivet(object):
                 array_to_sort[iter_k] = right_array[iter_j]
                 iter_j = iter_j + 1
                 iter_k = iter_k + 1
-
-    def from_xml(self, **kwargs):
-
-        ## Poznamka: blivet.devicetree.devices - tam ulozit nove objekty
-        ## Full dump nebo partial dump?
-
-        try:
-            xml_file = kwargs.get("input_file")
-        except:
-            log.error("ERROR:\tNo XML file specified")
-
-        ## Get root and devices + formats elements
-        self.xml_devices = ET.parse(xml_file).getroot()[0]
-        self.xml_formats = ET.parse(xml_file).getroot()[1]
-        parsed_list = []
-
-        for inc in self.xml_devices:
-            imp_str = self._from_xml_parse_name(inc[0]) ## parse name
-            obj = getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]) ## get object
-            parsed_list.append(self._from_xml_init_class(obj, inc, parsed_list))
-
-            #self._from_xml_init_class(self.devices, getattr(importlib.import_module(imp_str), inc[0].text.split(".")[-1]), inc))
-
-        return parsed_list
 
     def _from_xml_parse_name(self, in_elem, in_str = False):
 
