@@ -126,8 +126,7 @@ class LVMVolumeGroupDevice(ContainerDevice):
 
         super(LVMVolumeGroupDevice, self).__init__(name, parents=parents,
                                                    uuid=uuid, size=size,
-                                                   exists=exists, sysfs_path=sysfs_path,
-                                                   xml_import = xml_import, in_path = path)
+                                                   exists=exists, sysfs_path=sysfs_path)
 
         self.free = util.numeric_type(free)
         self.pe_size = util.numeric_type(pe_size)
