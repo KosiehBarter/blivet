@@ -84,10 +84,10 @@ class DeviceTree(object):
             :type dasd: :class:`~.dasd.DASD`
 
         """
-        self.reset(conf, passphrase, luks_dict, iscsi, dasd)
+        self.reset(conf, passphrase, luks_dict, iscsi, dasd, xml_file)
 
     def reset(self, conf=None, passphrase=None, luks_dict=None,
-              iscsi=None, dasd=None, xml_file = None):
+              iscsi=None, dasd=None, xml_file=None):
         """ Reset the instance to its initial state. """
         # internal data members
         self._devices = []
