@@ -70,7 +70,7 @@ class PartitionDevice(StorageDevice):
                  size=None, grow=False, maxsize=None, start=None, end=None,
                  major=None, minor=None, bootable=None,
                  sysfs_path='', parents=None, exists=False,
-                 part_type=None, primary=False, weight=0, xml_import = False):
+                 part_type=None, primary=False, weight=0, xml_dict=False):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -127,7 +127,7 @@ class PartitionDevice(StorageDevice):
         self.req_start_sector = None
         self.req_end_sector = None
         self.req_name = None
-        self.xml_import = xml_import
+        self.xml_dict = xml_dict
 
         # Parted_partition variables converted to PartitionDevice
         self.start = start
@@ -164,7 +164,7 @@ class PartitionDevice(StorageDevice):
 
         elif self.exists and not flags.testing:
             log.debug("looking up parted Partition: %s", self.path)
-            if not self.xml_import:
+            if not self.xml_dict:
                 self._parted_partition = self.disk.format.parted_disk.getPartitionByPath(self.path)
 
             ## Convert parted_partition to self.attributes
@@ -268,10 +268,10 @@ class PartitionDevice(StorageDevice):
         if newsize == Size(0):
             return newsize
 
-        if not self.xml_import:
+        if not self.xml_dict:
             (_constraint, geometry) = self._compute_resize(self.parted_partition,
                                                            newsize=newsize)
-        if self.xml_import:
+        if self.xml_dict:
             return Size(self.length)
         else:
             return Size(geometry.getLength(unit="B"))
@@ -549,11 +549,10 @@ class PartitionDevice(StorageDevice):
         if not self.exists:
             return
 
-        if self.xml_import == False:
+        if not self.xml_dict:
             self._size = Size(self.parted_partition.getLength(unit="B"))
             self._part_type = self.parted_partition.type
             self._bootable = self.get_flag(parted.PARTITION_BOOT)
-            #self._bootable = self.get_flag(parted.PARTITION_BOOT)
 
 
     def _wipe(self):
@@ -806,13 +805,13 @@ class PartitionDevice(StorageDevice):
             if self.parted_partition.geometry.end == extended.geometry.end:
                 return max_part_size
 
-        if self.xml_import:
+        if self.xml_dict:
             sector = self.end + 1
         else:
             sector = self.parted_partition.geometry.end + 1
 
         try:
-            if not self.xml_import:
+            if not self.xml_dict:
                 partition = self.parted_partition.disk.getPartitionBySector(sector)
             else:
                 max_part_size += Size(self.length)

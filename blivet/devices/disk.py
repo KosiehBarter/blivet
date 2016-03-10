@@ -353,7 +353,7 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
     _type = "iscsi"
     _packages = ["iscsi-initiator-utils", "dracut-network"]
 
-    def __init__(self, device, xml_dict=None, **kwargs):
+    def __init__(self, device, xml_dict=False, **kwargs):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -389,7 +389,7 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
             self.initiator = xml_dict.get("initiator")
 
 
-        if self.node is None:
+        if self.node is None and not xml_dict:
             # qla4xxx partial offload
             name = kwargs.pop("fw_name")
             address = kwargs.pop("fw_address")
@@ -400,8 +400,12 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
                                           nic=self.nic)
             log.debug("created new iscsi disk %s %s:%s using fw initiator %s",
                       name, address, port, self.initiator)
-        elif self.node is None and xml_dict is not None:
+        elif self.node is None and xml_dict:
             address = xml_dict.get("host_address")
+            self._name = xml_dict.get("name")
+            self._format = xml_dict.get("format")
+            self._current_size = xml_dict.get("current_size")
+            self._target_size = xml_dict.get("target_size")
 
         else:
             DiskDevice.__init__(self, device, **kwargs)
