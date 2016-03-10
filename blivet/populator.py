@@ -1651,6 +1651,7 @@ class Populator(object):
         xml_root = self._fxml_get_root(self.xml_file)
 
         self.device_stack = []
+        self.completed_devices = []
 
         ## Define basic shared lists
         self.device_list = []
@@ -1859,12 +1860,14 @@ class Populator(object):
                     obj_arg_dict.update({inc: temp_obj_dict.get(inc)})
 
             ## Finally, Init it
-            temp_obj = getattr(importlib.import_module(mod_path),
-                               mod_name)(obj_name, **obj_arg_dict)
-            if hasattr(temp_obj, "_fxml_set_attrs"):
-                temp_obj._fxml_set_attrs(temp_obj_dict, arg_list)
-            self.devicetree._add_device(temp_obj)
-            in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+            if temp_obj_dict.get("name") not in self.completed_devices:
+                temp_obj = getattr(importlib.import_module(mod_path),
+                                   mod_name)(obj_name, **obj_arg_dict)
+                if hasattr(temp_obj, "_fxml_set_attrs"):
+                    temp_obj._fxml_set_attrs(temp_obj_dict, arg_list)
+                self.devicetree._add_device(temp_obj)
+                in_master_list[list_index] = (temp_obj_str, temp_obj_dict, temp_obj)
+                self.completed_devices.append(temp_obj.name)
 
 ################################################################################
 ################# BASIC LOOP FUNCIONS ##########################################
