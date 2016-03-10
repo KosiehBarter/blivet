@@ -353,7 +353,7 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
     _type = "iscsi"
     _packages = ["iscsi-initiator-utils", "dracut-network"]
 
-    def __init__(self, device, **kwargs):
+    def __init__(self, device, xml_dict=None, **kwargs):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -377,10 +377,17 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
             :keyword fw_address: qla4xxx partial offload
             :keyword fw_port: qla4xxx partial offload
         """
-        self.node = kwargs.pop("node")
-        self.ibft = kwargs.pop("ibft")
-        self.nic = kwargs.pop("nic")
-        self.initiator = kwargs.pop("initiator")
+        if xml_dict is None:
+            self.node = kwargs.pop("node")
+            self.ibft = kwargs.pop("ibft")
+            self.nic = kwargs.pop("nic")
+            self.initiator = kwargs.pop("initiator")
+        else:
+            self.node = kwargs.get("node")
+            self.ibft = kwargs.get("ibft")
+            self.nic = kwargs.get("nic")
+            self.initiator = kwargs.get("initiator")
+
 
         if self.node is None:
             # qla4xxx partial offload

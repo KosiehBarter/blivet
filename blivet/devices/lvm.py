@@ -87,7 +87,7 @@ class LVMVolumeGroupDevice(ContainerDevice):
 
     def __init__(self, name, parents=None, size=None, free=None,
                  pe_size=None, pe_count=None, pe_free=None, pv_count=None,
-                 uuid=None, exists=False, sysfs_path='', xml_import=False, path=None):
+                 uuid=None, exists=False, sysfs_path='', xml_dict=None):
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -136,7 +136,7 @@ class LVMVolumeGroupDevice(ContainerDevice):
         self._reserved_space = Size(0)
 
         # Special bool for XML import
-        self.xml_import = xml_import
+        self.xml_dict = xml_dict
 
         # TODO: validate pe_size if given
         if not self.pe_size:
