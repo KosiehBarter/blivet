@@ -45,7 +45,7 @@ class DiskLabel(DeviceFormat):
     _name = N_("partition table")
     _formattable = True                # can be formatted
 
-    def __init__(self, **kwargs):
+    def __init__(self, xml_file=None, **kwargs):
         """
             :keyword device: full path to the block device node
             :type device: str

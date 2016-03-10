@@ -1801,14 +1801,21 @@ class Populator(object):
             ## Ignore certain attributes
             if inc.tag in ignored_attrs:
                 continue
-            elif inc.attrib.get("attr") == "format":
-                attr_value = self.format_list[index][-1]
+            elif inc.tag == "Child_ID":
+                attr_value = self._fxml_get_child_id(int(inc.text))
+                #attr_value = self.format_list[index][-1]
             else:
                 attr_value = self._fxml_parse_value(inc, in_master_list, index)
             temp_dict.update({inc.attrib.get("attr"): attr_value})
 
             ## Reassemble afterwards
             in_master_list[index] = (temp_obj_str, temp_dict)
+
+    def _fxml_get_child_id(self, in_id):
+        for inc in self.format_list:
+            if in_id == inc[1].get("xml_id"):
+                return inc[2]
+
 ################################################################################
 ################# INIT FUNCIONS ################################################
     def _fxml_init_class(self, in_master_list, list_index, forced_obj):

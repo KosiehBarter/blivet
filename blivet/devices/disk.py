@@ -377,7 +377,7 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
             :keyword fw_address: qla4xxx partial offload
             :keyword fw_port: qla4xxx partial offload
         """
-        if xml_dict is None:
+        if not xml_dict:
             self.node = kwargs.pop("node")
             self.ibft = kwargs.pop("ibft")
             self.nic = kwargs.pop("nic")

@@ -54,7 +54,8 @@ class LVMPhysicalVolume(DeviceFormat):
     _ks_mountpoint = "pv."
     _plugin = availability.BLOCKDEV_LVM_PLUGIN
 
-    def __init__(self, **kwargs):
+    def __init__(self, vg_name=None, vg_uuid=None, pe_start=lvm.LVM_PE_START,
+                 data_alignment=Size(0), **kwargs):
         """
             :keyword device: path to the block device node
             :keyword uuid: this PV's uuid (not the VG uuid)
@@ -77,10 +78,10 @@ class LVMPhysicalVolume(DeviceFormat):
         """
         log_method_call(self, **kwargs)
         DeviceFormat.__init__(self, **kwargs)
-        self.vg_name = kwargs.get("vg_name")
-        self.vg_uuid = kwargs.get("vg_uuid")
-        self.pe_start = kwargs.get("pe_start", lvm.LVM_PE_START)
-        self.data_alignment = kwargs.get("data_alignment", Size(0))
+        self.vg_name = vg_name
+        self.vg_uuid = vg_uuid
+        self.pe_start = pe_start
+        self.data_alignment = data_alignment
 
         self.inconsistent_vg = False
 
