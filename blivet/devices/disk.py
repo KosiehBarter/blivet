@@ -406,6 +406,11 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
             self._format = xml_dict.get("format")
             self._current_size = xml_dict.get("current_size")
             self._target_size = xml_dict.get("target_size")
+            self._size = xml_dict.get("size")
+            if xml_dict.get("original_format") is None:
+                self.original_format = self._format
+            else:
+                self.original_format = xml_dict.get("original_format")
 
         else:
             DiskDevice.__init__(self, device, **kwargs)
