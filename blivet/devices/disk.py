@@ -383,10 +383,10 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
             self.nic = kwargs.pop("nic")
             self.initiator = kwargs.pop("initiator")
         else:
-            self.node = kwargs.get("node")
-            self.ibft = kwargs.get("ibft")
-            self.nic = kwargs.get("nic")
-            self.initiator = kwargs.get("initiator")
+            self.node = xml_dict.get("node")
+            self.ibft = xml_dict.get("ibft")
+            self.nic = xml_dict.get("nic")
+            self.initiator = xml_dict.get("initiator")
 
 
         if self.node is None:
@@ -400,6 +400,9 @@ class iScsiDiskDevice(DiskDevice, NetworkStorageDevice):
                                           nic=self.nic)
             log.debug("created new iscsi disk %s %s:%s using fw initiator %s",
                       name, address, port, self.initiator)
+        elif self.node is None and xml_dict is not None:
+            address = xml_dict.get("host_address")
+
         else:
             DiskDevice.__init__(self, device, **kwargs)
             NetworkStorageDevice.__init__(self, host_address=self.node.address,
