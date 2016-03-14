@@ -628,7 +628,7 @@ class ObjectID(object):
         """
             This will fill a object with attributes
         """
-        ignored_attrs = set(["name", "xml_id", "format"] + in_list)
+        ignored_attrs = set(["name", "xml_id", "format", "__passphrase"] + in_list)
         for inc in in_dict:
             pass
             try:
@@ -685,7 +685,9 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if callable(inc) or inc.startswith("__") or \
+            if "__passphrase" in inc or \
+                callable(inc) or \
+                inc.startswith("__") or \
                 "method" in str(type(getattr(self, inc))) or \
                 inc in elems_done or "dependencies" in inc or \
                 self._to_xml_check_attrs(inc) or \
