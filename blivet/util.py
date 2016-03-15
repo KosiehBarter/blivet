@@ -624,20 +624,6 @@ class ObjectID(object):
         self.id = self._newid_gen()  # pylint: disable=attribute-defined-outside-init
         return self
 
-    def _fxml_set_attrs(self, in_dict, in_list):
-        """
-            This will fill a object with attributes
-        """
-        ignored_attrs = set(["name", "xml_id", "format", "__passphrase"] + in_list)
-        for inc in in_dict:
-            pass
-            try:
-                if inc not in ignored_attrs :
-                    setattr(self, inc, in_dict.get(inc))
-                else:
-                    continue
-            except Exception as e:
-                pass
 
     def to_xml(self, parent_elem=None, root_elem=None, format_list=None,
                device_ids=None, super_elems=None, format_elems=None):
@@ -685,14 +671,7 @@ class ObjectID(object):
             if inc.startswith("_") and hasattr(self, inc[1:]):
                 inc = inc[1:]
 
-            if "__passphrase" in inc or \
-                callable(inc) or \
-                inc.startswith("__") or \
-                "method" in str(type(getattr(self, inc))) or \
-                inc in elems_done or "dependencies" in inc or \
-                self._to_xml_check_attrs(inc) or \
-                self._to_xml_check_types(self, inc) or\
-                "parted." in str(type(getattr(self, inc))):
+            if self._to_xml_check_ignored(inc):
                 continue
 
             elif inc == "id":
@@ -744,7 +723,7 @@ class ObjectID(object):
 
             else:
                 xml_sublist.append(ET.SubElement(parent_elem, "prop"))
-                if str(type(getattr(self, inc))).split("'")[1] == "blivet.size.Size":
+                if "blivet.size.Size" in str(type(getattr(self, inc))):
                     integer_override = True
                 else:
                     integer_override = False
@@ -757,24 +736,37 @@ class ObjectID(object):
                                         ET.Comment({"Size": getattr(self, inc)})))
             elems_done.append(inc)
 
-    def _to_xml_check_attrs(self, in_attr):
+    def _to_xml_check_ignored(self, in_attr):
+        ign_attrs = {"passphrase", "_abc_", "sync", "dict", "mount",
+                     "name", "_newid_gen", "_levels", "_newid_func",
+                     "primary_partitions", "_plugin", "_info_class", "_resize",
+                     "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info"}
+        ign_types = {"parted.", "method", "abc", "_ped.", ".tasks.", "function",
+                     "dict", "functools."}
+        try:
+            type_in_str = str(type(getattr(self, in_attr))).split("'")[1]
+        except Exception as e:
+            return True
 
-        for inc in {"_abc_", "sync", "dict", "mount", "name", "_newid_gen",
-                    "_levels", "_newid_func", "primary_partitions", "_plugin",
-                    "_info_class", "_resize", "_writelabel", "_minsize", "_mkfs",
-                    "_readlabel", "_size_info"}:
-            if inc in in_attr:
-                return True
-        return False
+        if type_in_str == str:
+            for attrib in ign_attrs:
+                if attrib in in_attr:
+                    return True
 
-    def _to_xml_check_types(self, in_obj, inc):
+        elif callable(in_attr):
+            return True
 
-        type_in_str = str(type(getattr(in_obj, inc))).split("'")[1]
+        elif in_attr.startswith("__"):
+            return True
 
-        for inc in ["abc", "_ped.", ".tasks.", "function"]:
-            if inc in type_in_str:
-                return True
-        return False
+        elif type_in_str != str:
+            for atr_type in ign_types:
+                if atr_type in type_in_str:
+                    return True
+        else:
+            return False
+
+
 
     def _to_xml_parse_tuple(self, in_tuple, in_elem):
         """
