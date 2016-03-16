@@ -808,6 +808,7 @@ class ObjectID(object):
                 elem.text = str(getattr(tag, "id"))
                 elem.set("attr", "id")
             elif "parted." in attr_type:
+                attr_type = "Child_Path"
                 elem.text = str(getattr(tag, "path")).split("/")[-1]
             else:
                 elem.text = str(tag)
