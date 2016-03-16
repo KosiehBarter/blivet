@@ -737,13 +737,35 @@ class ObjectID(object):
             elems_done.append(inc)
 
     def _to_xml_check_ignored(self, in_attr):
-        ign_attrs = {"passphrase", "_abc_", "sync", "dict", "mount",
+        ign_attrs = ["passphrase", "_abc", "dict", "sync", "mount",
                      "name", "_newid_gen", "_levels", "_newid_func",
                      "primary_partitions", "_plugin", "_info_class", "_resize",
-                     "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info"}
-        ign_types = {"parted.", "method", "abc", "_ped.", ".tasks.", "function",
-                     "dict", "functools."}
+                     "_writelabel", "_minsize", "_mkfs", "_readlabel", "_size_info",
+                     "xml_dict", "_levels", "format_class"]
+        ign_types = ["parted.", "method", "abc", "_ped.", ".tasks.", "function",
+                     "functools.", "set"]
+
+        if in_attr.startswith("__"):
+            return True
+
+        elif callable(in_attr):
+            return True
+
+        for attr in ign_attrs:
+            if attr in in_attr:
+                return True
+
         try:
+            type_in_str = str(type(getattr(self, in_attr))).split("'")[1]
+        except Exception as e:
+            return True
+
+        for attr_type in ign_types:
+            if attr_type in type_in_str:
+                return True
+
+        return False
+        """try:
             type_in_str = str(type(getattr(self, in_attr))).split("'")[1]
         except Exception as e:
             return True
@@ -763,8 +785,10 @@ class ObjectID(object):
             for atr_type in ign_types:
                 if atr_type in type_in_str:
                     return True
+        elif in_attr == "dict" and type_in_str == "dict":
+            return True
         else:
-            return False
+            return False"""
 
 
 
