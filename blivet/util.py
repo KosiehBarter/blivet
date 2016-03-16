@@ -765,31 +765,6 @@ class ObjectID(object):
                 return True
 
         return False
-        """try:
-            type_in_str = str(type(getattr(self, in_attr))).split("'")[1]
-        except Exception as e:
-            return True
-
-        if type_in_str == str:
-            for attrib in ign_attrs:
-                if attrib in in_attr:
-                    return True
-
-        elif callable(in_attr):
-            return True
-
-        elif in_attr.startswith("__"):
-            return True
-
-        elif type_in_str != str:
-            for atr_type in ign_types:
-                if atr_type in type_in_str:
-                    return True
-        elif in_attr == "dict" and type_in_str == "dict":
-            return True
-        else:
-            return False"""
-
 
 
     def _to_xml_parse_tuple(self, in_tuple, in_elem):
@@ -828,18 +803,22 @@ class ObjectID(object):
         integer_override = kwargs.get("integer_override")
 
         if input_type == "list":
+            attr_type = str(type(tag)).split("'")[1]
             if hasattr(tag, "id"):
                 elem.text = str(getattr(tag, "id"))
                 elem.set("attr", "id")
+            elif "parted." in attr_type:
+                elem.text = str(getattr(tag, "path")).split("/")[-1]
             else:
                 elem.text = str(tag)
-            elem.set("type", str(type(tag)).split("'")[1])
+            elem.set("type", attr_type)
         else:
             elem.set("attr", str(tag))
             elem.set("type", str(type(getattr(self, tag))).split("\'")[1])
 
             ## Decide if to re-type integers or not, mainly for size
             if integer_override == True:
+                elem.set("Size", str(getattr(self, tag)))
                 elem_text = str(int(getattr(self, tag)))
             else:
                 elem_text = str(getattr(self, tag))
