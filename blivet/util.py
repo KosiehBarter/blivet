@@ -626,7 +626,8 @@ class ObjectID(object):
 
 
     def to_xml(self, parent_elem=None, root_elem=None, format_list=None,
-               device_ids=None, super_elems=None, format_elems=None):
+               device_ids=None, super_elems=None, format_elems=None, disk_elems=None,
+               in_object=None):
         """
             Export data to XML format and then return them to the caller.
 
@@ -662,10 +663,16 @@ class ObjectID(object):
         xml_sublist = []
         xml_child_sublist = []
 
-        input_data = dir(self)
+        if in_object == None:
+            input_data = dir(self)
+            fulltype = str(type(self)).split("'")[1]
+        else:
+            input_data = dir(in_object)
+            fulltype = str(type(in_object)).split("'")[1]
 
         xml_sublist.append(ET.SubElement(parent_elem, "fulltype"))
-        xml_sublist[-1].text = str(type(self)).split("'")[1]
+        xml_sublist[-1].text = fulltype
+
         for inc in input_data:
             ## Basic fix - replace all underscore attrs with non-underscore
             if inc.startswith("_") and hasattr(self, inc[1:]):
@@ -698,6 +705,19 @@ class ObjectID(object):
                                                  {"attr": str(inc),
                                                   "type": str(tuple).split("'")[1]}))
                 self._to_xml_parse_tuple(getattr(self, inc), xml_sublist[-1])
+
+            elif inc == "cache" and getattr(self, inc) is not None: # in str(type(getattr(self, inc))):
+                xml_sublist.append(ET.SubElement(parent_elem, "LVMCache", {"type": "object"}))
+                cache_obj_id = str(getattr(self, inc)).split(">")[0].split(" ")[-1]
+                xml_sublist[-1].text = cache_obj_id
+                if cache_obj_id not in device_ids:
+                    device_ids.append(cache_obj_id)
+                    disk_elems.append(ET.SubElement(super_elems[0], "LVMCache", attrib={"object": cache_obj_id}))
+                    self.to_xml(parent_elem = disk_elems[-1],
+                                in_object = getattr(self, inc),
+                                device_ids=device_ids)
+                else:
+                    pass
 
             # Check if subobject has to_xml() method to dump from it too
             elif hasattr(getattr(self, inc), "to_xml") and \

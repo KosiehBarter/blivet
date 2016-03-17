@@ -235,7 +235,8 @@ class Blivet(object):
                            super_elems = super_elems,
                            format_elems = format_elems,
                            format_list = list_of_formats,
-                           device_ids = list_of_devices)
+                           device_ids = list_of_devices,
+                           disk_elems = disk_elems)
 
         self._to_xml_indent(master_root_elem)
         ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
