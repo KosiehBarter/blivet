@@ -70,7 +70,7 @@ class DeviceTree(object):
     """
 
     def __init__(self, conf=None, passphrase=None, luks_dict=None,
-                 iscsi=None, dasd=None, xml_file=None):
+                 iscsi=None, dasd=None):
         """
 
             :keyword conf: storage discovery configuration
@@ -84,10 +84,10 @@ class DeviceTree(object):
             :type dasd: :class:`~.dasd.DASD`
 
         """
-        self.reset(conf, passphrase, luks_dict, iscsi, dasd, xml_file)
+        self.reset(conf, passphrase, luks_dict, iscsi, dasd)
 
     def reset(self, conf=None, passphrase=None, luks_dict=None,
-              iscsi=None, dasd=None, xml_file=None):
+              iscsi=None, dasd=None):
         """ Reset the instance to its initial state. """
         # internal data members
         self._devices = []
@@ -111,8 +111,7 @@ class DeviceTree(object):
                                     passphrase=passphrase,
                                     luks_dict=luks_dict,
                                     iscsi=iscsi,
-                                    dasd=dasd,
-                                    xml_file=xml_file)
+                                    dasd=dasd)
 
     def __str__(self):
         done = []
@@ -329,7 +328,7 @@ class DeviceTree(object):
     #
     # Device detection
     #
-    def populate(self, cleanup_only=False, xml_file=None):
+    def populate(self, cleanup_only=False):
         """ Locate all storage devices.
 
             Everything should already be active. We just go through and gather
@@ -342,7 +341,7 @@ class DeviceTree(object):
         udev.settle()
         self.drop_lvm_cache()
         try:
-            self._populator.populate(cleanup_only=cleanup_only, xml_file=xml_file)
+            self._populator.populate(cleanup_only=cleanup_only)
         except Exception:
             raise
         finally:
