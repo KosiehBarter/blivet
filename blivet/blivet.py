@@ -302,12 +302,20 @@ class Blivet(object):
         if in_str == False:
             parsed_obj = in_elem.text
         else:
+<<<<<<< HEAD
             parsed_obj = in_elem
 
         ## Do a scan
         for enc in range(len(parsed_obj.split(".")) - 1):
             imp_str = imp_str + "." + parsed_obj.split(".")[enc]
         return imp_str[1:]
+=======
+            selected_devs = xml_util.select_device(self.devices, dump_device)
+
+        xml_util.export_iterate(selected_devs, master_root_elem, super_elems)
+
+        xml_util.save_file(master_root_elem, dump_device, custom_name, rec_bool)
+>>>>>>> Release canditate: implemented:
 
     def do_it(self, callbacks=None):
         """
