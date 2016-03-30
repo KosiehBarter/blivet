@@ -26,8 +26,6 @@ import shelve
 import contextlib
 import time
 import functools
-import xml.etree.ElementTree as ET
-
 
 from .storage_log import log_method_call, log_exception_info
 <<<<<<< HEAD
@@ -35,13 +33,18 @@ from .devices import BTRFSSubVolumeDevice, BTRFSVolumeDevice
 from .devices import LVMLogicalVolumeDevice, LVMVolumeGroupDevice
 =======
 from .devices import BTRFSDevice, BTRFSSubVolumeDevice, BTRFSVolumeDevice
+<<<<<<< HEAD
 from .devices import LVMLogicalVolumeDevice, LVMThinLogicalVolumeDevice, LVMThinPoolDevice, LVMVolumeGroupDevice
 >>>>>>> New function: xml export and import
+=======
+from .devices import LVMLogicalVolumeDevice, LVMVolumeGroupDevice
+>>>>>>> Fixed several errors
 from .devices import MDRaidArrayDevice, PartitionDevice, TmpFSDevice, device_path_to_name
 from .deviceaction import ActionCreateDevice, ActionCreateFormat, ActionDestroyDevice
 from .deviceaction import ActionDestroyFormat, ActionResizeDevice, ActionResizeFormat
 from .devicelibs.edd import get_edd_dict
 from .devicelibs.btrfs import MAIN_VOLUME_ID
+from .devicelibs.crypto import LUKS_METADATA_SIZE
 from .errors import StorageError
 from .size import Size
 from .devicetree import DeviceTree
@@ -51,27 +54,39 @@ from .platform import platform as _platform
 from .formats import get_format
 from . import arch
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 from . import iscsi
 from . import fcoe
 from . import zfcp
 >>>>>>> New function: xml export and import
+=======
+from .iscsi import iscsi
+from .fcoe import fcoe
+from .zfcp import zfcp
+>>>>>>> Fixed several errors
 from . import devicefactory
+<<<<<<< 094a6effbb0985d041cf77fd27db435b1ab0a7f7
 from . import get_sysroot, short_product_name, __version__
 from .threads import SynchronizedMeta
-from .util import open  # pylint: disable=redefined-builtin
+from . import xml_util
+>>>>>>> Fixed several errors
 
 import logging
 log = logging.getLogger("blivet")
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 class Blivet(object, metaclass=SynchronizedMeta):
 =======
 def empty_device(device, devicetree):
+=======
+def empty_device(device):
+>>>>>>> Fixed several errors
     empty = True
     if device.partitioned:
-        partitions = devicetree.get_children(device)
+        partitions = device.children
         empty = all([p.is_magic for p in partitions])
     else:
         empty = (device.format.type is None)
@@ -115,8 +130,12 @@ class StorageDiscoveryConfig(object):
         self.zero_mbr = ksdata.zerombr.zerombr
 
 
+<<<<<<< HEAD
 class Blivet(object):
 >>>>>>> New function: xml export and import
+=======
+class Blivet(object, metaclass=SynchronizedMeta):
+>>>>>>> Fixed several errors
 
     """ Top-level class for managing storage configuration. """
 
@@ -138,8 +157,6 @@ class Blivet(object):
         self.autopart_add_backup_passphrase = False
         self.autopart_requests = []
         self.edd_dict = {}
-        self.dasd = []
-        self.xml_file = xml_file
 
         self.ignored_disks = []
         self.exclusive_disks = []
@@ -149,10 +166,6 @@ class Blivet(object):
         self.size_sets = []
         self.set_default_fstype(get_default_filesystem_type())
         self._default_boot_fstype = None
-
-        self.iscsi = iscsi.iscsi()
-        self.fcoe = fcoe.fcoe()
-        self.zfcp = zfcp.ZFCP()
 
         self._next_id = 0
         self._dump_file = "%s/storage.state" % tempfile.gettempdir()
@@ -167,9 +180,7 @@ class Blivet(object):
 =======
         self.devicetree = DeviceTree(conf=self.config,
                                      passphrase=self.encryption_passphrase,
-                                     luks_dict=self.__luks_devs,
-                                     iscsi=self.iscsi,
-                                     dasd=self.dasd)
+                                     luks_dict=self.__luks_devs)
         self.fsset = FSSet(self.devicetree)
 >>>>>>> New function: xml export and import
         self.roots = []
@@ -177,145 +188,18 @@ class Blivet(object):
 
     def to_xml(self, dump_device=None, custom_name=None, rec_bool=False):
         """
-            This is the master to_xml() function. It basically gathers the data and
-            performs parsing to XML notation on its children.
-
-            param str dump_device: a name of device to be dumped, if nothing, all devices are dumped.
-
-            This function is like a ignition - its run by Blivet itself and runs major part of itself
-            in blivet/util.py - to_xml(), which "does the hard dirty work".
-
-            param str dump_device: name of device that will be dumped.
-            param str custom_name: custom name supplied by the user
-            param bool rec_bool: NOTE: Must be used with dump_device: decide if to dump recursively or not
+            docstring
         """
-        # Declare master element and list of elems
-        master_root_elem = ET.Element("Blivet-XML-Tools")
+        master_root_elem, super_elems = xml_util.create_basics()
 
-        super_elems = []
-        disk_elems = []
-        format_elems = []
-        parted_elems = []
-
-        list_of_formats = [] # This helps in util.py to determine if to gather multiple formats or not
-        list_of_devices = [] # Same function as list_of_formats
-
-        input_list = []
-
-        file_name = socket.gethostname().split(".")[0]
-
-        if custom_name != None:
-            file_name = custom_name
-
-        if dump_device == None:
-            input_list = self.devices
-            file_name = file_name
+        if rec_bool or dump_device is not None:
+            selected_devs = xml_util.select_device(self.devices, dump_device, rec_bool)
         else:
-            for inc in self.devices:
-                if rec_bool == True:
-                    if inc.name.startswith(dump_device):
-                        input_list.append(inc)
-                    else:
-                        log.error("Device %s NOT IN LIST" % dump_device)
-                elif dump_device == inc.name:
-                    input_list.append(inc)
-            file_name = file_name + "-" + dump_device
-
-        if rec_bool == True:
-            file_name = file_name + "-recursive"
-
-        ## Finally, add extension
-        file_name = file_name + ".xml"
-
-        self._to_xml_sort(input_list)
-
-        super_elems.append(ET.SubElement(master_root_elem, "Devices"))
-        super_elems.append(ET.SubElement(master_root_elem, "Formats"))
-
-        for inc in input_list:
-            if hasattr(inc, "to_xml"):
-                disk_elems.append(ET.SubElement(super_elems[0],
-                                                str(type(inc)).split("'")[1].split(".")[-1],
-                                                {"id": str(getattr(inc, "id")),
-                                                "name": str(getattr(inc, "name"))}))
-                inc.to_xml(parent_elem = disk_elems[-1],
-                           root_elem = master_root_elem,
-                           super_elems = super_elems,
-                           format_elems = format_elems,
-                           format_list = list_of_formats,
-                           device_ids = list_of_devices,
-                           disk_elems = disk_elems)
-
-        self._to_xml_indent(master_root_elem)
-        ET.ElementTree(master_root_elem).write(file_name, xml_declaration = True, encoding = "utf-8")
-
-    def _to_xml_sort(self, array_to_sort):
-
-        if len(array_to_sort) > 1:
-            middle_piv = len(array_to_sort) / 2
-
-            left_array = []
-            right_array = []
-
-            for inc in range(len(array_to_sort)):
-                if inc < middle_piv:
-                    left_array.append(array_to_sort[inc])
-                else:
-                    right_array.append(array_to_sort[inc])
-
-            self._to_xml_sort(left_array)
-            self._to_xml_sort(right_array)
-
-            iter_i = 0
-            iter_j = 0
-            iter_k = 0
-
-            while iter_i < len(left_array) and iter_j < len(right_array):
-                if left_array[iter_i].id < right_array[iter_j].id:
-                    array_to_sort[iter_k] = left_array[iter_i]
-                    iter_i = iter_i + 1
-                else:
-                    array_to_sort[iter_k] = right_array[iter_j]
-                    iter_j = iter_j + 1
-                iter_k = iter_k + 1
-
-            while iter_i < len(left_array):
-                array_to_sort[iter_k] = left_array[iter_i]
-                iter_i = iter_i + 1
-                iter_k = iter_k + 1
-
-            while iter_j < len(right_array):
-                array_to_sort[iter_k] = right_array[iter_j]
-                iter_j = iter_j + 1
-                iter_k = iter_k + 1
-
-    def _from_xml_parse_name(self, in_elem, in_str = False):
-
-        """
-            This function basically parses a name from fulltype element or any
-            other input element.
-
-            param ET.Element in_elem: Input element to parse from its text
-        """
-        imp_str = ""
-
-        if in_str == False:
-            parsed_obj = in_elem.text
-        else:
-<<<<<<< HEAD
-            parsed_obj = in_elem
-
-        ## Do a scan
-        for enc in range(len(parsed_obj.split(".")) - 1):
-            imp_str = imp_str + "." + parsed_obj.split(".")[enc]
-        return imp_str[1:]
-=======
-            selected_devs = xml_util.select_device(self.devices, dump_device)
+            selected_devs = self.devices
 
         xml_util.export_iterate(selected_devs, master_root_elem, super_elems)
 
         xml_util.save_file(master_root_elem, dump_device, custom_name, rec_bool)
->>>>>>> Release canditate: implemented:
 
     def do_it(self, callbacks=None):
         """
@@ -367,21 +251,20 @@ class Blivet(object):
                               disk_images=self.disk_images)
 =======
         if flags.installer_mode and not flags.image_install:
-            self.iscsi.startup()
-            self.fcoe.startup()
-            self.zfcp.startup()
-            self.dasd = self.devicetree.make_dasd_list(self.dasd, self.devices)
-
-        if self.dasd:
-            # Reset the internal dasd list (823534)
-            self.dasd = []
+            iscsi.startup()
+            fcoe.startup()
+            zfcp.startup()
 
         self.devicetree.reset(conf=self.config,
                               passphrase=self.encryption_passphrase,
+<<<<<<< HEAD
                               luks_dict=self.__luks_devs,
                               iscsi=self.iscsi,
                               dasd=self.dasd)
 >>>>>>> New function: xml export and import
+=======
+                              luks_dict=self.__luks_devs)
+>>>>>>> Fixed several errors
         self.devicetree.populate(cleanup_only=cleanup_only)
         self.edd_dict = get_edd_dict(self.partitioned)
         self.devicetree.edd_dict = self.edd_dict
@@ -451,7 +334,7 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        partitions = self.devicetree.get_devices_by_instance(PartitionDevice)
+        partitions = [d for d in self.devices if isinstance(d, PartitionDevice)]
         partitions.sort(key=lambda d: d.name)
         return partitions
 
@@ -463,7 +346,7 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        vgs = self.devicetree.get_devices_by_type("lvmvg")
+        vgs = [d for d in self.devices if d.type == "lvmvg"]
         vgs.sort(key=lambda d: d.name)
         return vgs
 
@@ -486,7 +369,7 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        thin = self.devicetree.get_devices_by_type("lvmthinlv")
+        thin = [d for d in self.devices if d.type == "lvmthinlv"]
         thin.sort(key=lambda d: d.name)
         return thin
 
@@ -498,7 +381,7 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        pools = self.devicetree.get_devices_by_type("lvmthinpool")
+        pools = [d for d in self.devices if d.type == "lvmthinpool"]
         pools.sort(key=lambda d: d.name)
         return pools
 
@@ -523,14 +406,14 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        arrays = self.devicetree.get_devices_by_type("mdarray")
+        arrays = [d for d in self.devices if d.type == "mdarray"]
         arrays.sort(key=lambda d: d.name)
         return arrays
 
     @property
     def mdcontainers(self):
         """ A list of the MD containers in the device tree. """
-        arrays = self.devicetree.get_devices_by_type("mdcontainer")
+        arrays = [d for d in self.devices if d.type == "mdcontainer"]
         arrays.sort(key=lambda d: d.name)
         return arrays
 
@@ -555,7 +438,7 @@ class Blivet(object):
             does not necessarily reflect the actual on-disk state of the
             system's disks.
         """
-        return sorted(self.devicetree.get_devices_by_type("btrfs volume"),
+        return sorted((d for d in self.devices if d.type == "btrfs volume"),
                       key=lambda d: d.name)
 
     @property
@@ -614,7 +497,7 @@ class Blivet(object):
             if not self.config.initialize_disks or not device.is_disk:
                 return False
 
-            if not empty_device(device, self.devicetree):
+            if not empty_device(device):
                 return False
 
         if isinstance(device, PartitionDevice):
@@ -639,7 +522,7 @@ class Blivet(object):
                 # if clear_part_type is not CLEARPART_TYPE_ALL but we'll still be
                 # removing every partition from the disk, return True since we
                 # will want to be able to create a new disklabel on this disk
-                if not empty_device(device, self.devicetree):
+                if not empty_device(device):
                     return False
 
             # Never clear disks with hidden formats
@@ -652,7 +535,7 @@ class Blivet(object):
             # initialize disks as needed
             if (clear_part_type == CLEARPART_TYPE_LINUX and
                 not ((self.config.initialize_disks and
-                      empty_device(device, self.devicetree)) or
+                      empty_device(device)) or
                      (not device.partitioned and device.format.linux_native))):
                 return False
 
@@ -699,7 +582,7 @@ class Blivet(object):
             if magic:
                 expected = 1
                 # remove the magic partition
-                for part in self.devicetree.get_children(disk):
+                for part in disk.children:
                     if part.parted_partition.number == magic:
                         log.debug("removing %s", part.name)
                         # We can't schedule the magic partition for removal
@@ -941,6 +824,11 @@ class Blivet(object):
         else:
             vg = parent
 
+        if thin_volume:
+            kwargs["seg_type"] = "thin"
+        if thin_pool:
+            kwargs["seg_type"] = "thin-pool"
+
         mountpoint = kwargs.pop("mountpoint", None)
         if 'fmt_type' in kwargs:
             kwargs["fmt"] = get_format(kwargs.pop("fmt_type"),
@@ -981,14 +869,7 @@ class Blivet(object):
             if cache_req:
                 raise ValueError("Creating cached thin volumes and pools is not supported")
 
-        if thin_pool:
-            device_class = LVMThinPoolDevice
-        elif thin_volume:
-            device_class = LVMThinLogicalVolumeDevice
-        else:
-            device_class = LVMLogicalVolumeDevice
-
-        return device_class(name, *args, **kwargs)
+        return LVMLogicalVolumeDevice(name, *args, **kwargs)
 
     def new_btrfs(self, *args, **kwargs):
         """ Return a new BTRFSVolumeDevice or BRFSSubVolumeDevice.
@@ -1163,22 +1044,36 @@ class Blivet(object):
         if device.protected:
             raise ValueError("cannot modify protected device")
 
-        classes = []
+        actions = []
+
         if device.resizable:
-            classes.append(ActionResizeDevice)
+            actions.append(ActionResizeDevice(device, new_size))
 
         if device.format.resizable:
-            classes.append(ActionResizeFormat)
+            if device.format.type == "luks" and device.children:
+                # resize the luks format
+                actions.append(ActionResizeFormat(device, new_size - LUKS_METADATA_SIZE))
 
-        if not classes:
+                luks_dev = device.children[0]
+                if luks_dev.resizable:
+                    # resize the luks device
+                    actions.append(ActionResizeDevice(luks_dev, new_size - LUKS_METADATA_SIZE))
+
+                if luks_dev.format.resizable:
+                    # resize the format on the luks device
+                    actions.append(ActionResizeFormat(luks_dev, new_size - LUKS_METADATA_SIZE))
+            else:
+                actions.append(ActionResizeFormat(device, new_size))
+
+        if not actions:
             raise ValueError("device cannot be resized")
 
         # if this is a shrink, schedule the format resize first
         if new_size < device.size:
-            classes.reverse()
+            actions.reverse()
 
-        for action_class in classes:
-            self.devicetree.actions.add(action_class(device, new_size))
+        for action in actions:
+            self.devicetree.actions.add(action)
 
     def safe_device_name(self, name):
         """ Convert a device name to something safe and return that.
@@ -1342,21 +1237,30 @@ class Blivet(object):
 =======
         self.fsset.write()
         self.make_mtab()
+<<<<<<< HEAD
         self.iscsi.write(get_sysroot(), self)
         self.fcoe.write(get_sysroot())
         self.zfcp.write(get_sysroot())
         self.write_dasd_conf(self.dasd, get_sysroot())
 >>>>>>> New function: xml export and import
+=======
+        iscsi.write(get_sysroot(), self)
+        fcoe.write(get_sysroot())
+        zfcp.write(get_sysroot())
+        self.write_dasd_conf(get_sysroot())
+>>>>>>> Fixed several errors
 
-    def write_dasd_conf(self, disks, root):
+    def write_dasd_conf(self, root):
         """ Write /etc/dasd.conf to target system for all DASD devices
             configured during installation.
         """
-        if not (arch.is_s390() and disks):
+        dasds = [d for d in self.devices if d.type == "dasd"]
+        dasds.sort(key=lambda d: d.name)
+        if not (arch.is_s390() and dasds):
             return
 
         with open(os.path.realpath(root + "/etc/dasd.conf"), "w") as f:
-            for dasd in sorted(disks, key=lambda d: d.name):
+            for dasd in dasds:
                 fields = [dasd.busid] + dasd.get_opts()
                 f.write("%s\n" % " ".join(fields),)
 
@@ -1396,7 +1300,7 @@ class Blivet(object):
 
         if (not fmt.mountable or not fmt.formattable or not fmt.supported or
                 not fmt.linux_native):
-            log.debug("invalid default fstype: %r", fmt)
+            log.debug("invalid default fstype (%s): %r", newtype, fmt)
             raise ValueError("new value %s is not valid as a default fs type" % newtype)
 
         self._default_fstype = newtype  # pylint: disable=attribute-defined-outside-init
@@ -1742,6 +1646,7 @@ class Blivet(object):
         """
 
         self.fsset.set_fstab_swaps(devices)
+<<<<<<< HEAD
 
 <<<<<<< HEAD
     def to_xml(self):
@@ -1774,3 +1679,5 @@ def indent(elem, level=0):
             if level and (not elem.tail or not elem.tail.strip()):
                 elem.tail = i
 >>>>>>> New function: xml export and import
+=======
+>>>>>>> Fixed several errors

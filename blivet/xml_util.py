@@ -1,12 +1,10 @@
-from .util import ObjectID
+from . import util
 import xml.etree.ElementTree as ET
-<<<<<<< HEAD
-=======
 from socket import gethostname
 
 ################################################################################
 ##### BASIC FUNCTIONS
-def create_foundation():
+def create_basics():
     """
         This function creates root element and subelements that will be filled
         with Devices and Formats. Returns tuple: ET.Element and list
@@ -38,7 +36,7 @@ def save_file(root_elem, dump_device=None, custom_name=None, rec_bool=False):
     final_name = final_name + ".xml"
     ET.ElementTree(root_elem).write(final_name, xml_declaration=True, encoding="utf-8")
 
-def select_device(dev_list, dump_device):
+def select_device(dev_list, dump_device, rec_bool):
     """
         Docstring
     """
@@ -46,6 +44,8 @@ def select_device(dev_list, dump_device):
     for dev in dev_list:
         if dump_device in dev:
             selected_devs.append(dev)
+            if rec_bool:
+                break
     return selected_devs
 
 def export_iterate(device_list, super_elems, master_root_elem):
@@ -275,8 +275,8 @@ class XMLUtils(util.ObjectID):
                 print (e, attr)
                 continue
 
->>>>>>> Release canditate: implemented:
 
+            """
 class XMLUtils(ObjectID):
     def __init__(self):
         super(XMLUtils, self).__init__()
@@ -284,7 +284,7 @@ class XMLUtils(ObjectID):
     def to_xml(self, parent_elem=None, root_elem=None, format_list=None,
                device_ids=None, super_elems=None, format_elems=None, disk_elems=None,
                in_object=None):
-        """
+
             Export data to XML format and then return them to the caller.
 
             :param bool full_dump: If to perform full dump, or not.
@@ -313,7 +313,7 @@ class XMLUtils(ObjectID):
             parser switches itself to root, then reexecutes itself on format instance and
             parses its attributes to elements.
 
-        """
+
         elems_done = [] # Elements, that are done. Prevents duplicates.
 
         xml_sublist = []
@@ -444,9 +444,9 @@ class XMLUtils(ObjectID):
 
 
     def _to_xml_parse_tuple(self, in_tuple, in_elem):
-        """
+
             Parses tuple like a list
-        """
+
         tuple_list = []
         for inc in in_tuple:
             tuple_list.append(ET.SubElement(in_elem, "item"))
@@ -455,9 +455,9 @@ class XMLUtils(ObjectID):
             tuple_list[-1].set("type", str(type(inc)).split("\'")[1])
 
     def _to_xml_parse_list(self, input_list, parent_index):
-        """
+
             This function basically parses a list into indenpendent elements
-        """
+
         xml_sublist_items = []
 
         for inc in input_list:
@@ -466,12 +466,12 @@ class XMLUtils(ObjectID):
 
 
     def _to_xml_set_data(self, **kwargs):
-        """
+
             Sets element attribute at one place
 
             :param ET.Element elem: A ET.Element item (capable to perform ET.Element operations)
             :param str tag: a string name of a attribute (eg name, path...)
-        """
+
         elem = kwargs.get("elem")
         tag = kwargs.get("tag")
         full_bool = kwargs.get("full_bool")
@@ -500,7 +500,7 @@ class XMLUtils(ObjectID):
             else:
                 elem_text = str(getattr(self, tag))
             if full_bool == True:
-                elem.text = elem_text
+                elem.text = elem_text"""
 
     def _getdeepattr(self, obj, name):
         """This behaves as the standard getattr, but supports
