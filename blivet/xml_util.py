@@ -94,33 +94,30 @@ class XMLUtils(util.ObjectID):
                               "complex", "blivet.devices.lib.ParentList",
                               "blivet.formats.", "blivet.devicelibs.",
                               "XMLFormat"]
+        self.xml_unallowed_types = ["parted."]
         self.xml_ign_attrs = ["passphrase", "xml", "abc", "dependencies", "dict"]
-
-        self.xml_ign_attrs_old = ["_abc", "dict", "sync", "mount",
-                          "name", "_newid_gen", "_levels", "_newid_func",
-                          "primary_partitions", "_plugin", "_info_class", "_resize",
-                          "_writelabel", "_minsize", "_mkfs", "_readlabel",
-                          "_size_info", "xml_dict", "_levels", "format_class", "id",
-                          "xml_elems_list", "fxml", "_to_xml", "xml_parent_elem",
-                          "device_elems", "format_elems", "xml_attr_list", "xml_ign_attrs",
-                          "ign_types", "xml_root_elem", "xml_attrs_done", "dependencies",
-                          "negatives", "positives"]
 
 ################################################################################
 ##### Check ignored
     def _to_xml_check_igns(self, in_attr):
         if in_attr.startswith("__") or\
             self._to_xml_check_xml_ign_attrs(in_attr) or\
-            not self._to_xml_check_ign_types(in_attr) or\
+            not self._to_xml_check_allowed_types() or\
+            self._to_xml_check_ign_types() or\
             in_attr in self.xml_attrs_done:
             return True
         else:
             return False
 
-    def _to_xml_check_ign_types(self, in_attr):
-        tmp_type = str(type(getattr(self, in_attr))).split("'")[-2]
+    def _to_xml_check_ign_types(self):
+        for ig_type in self.xml_unallowed_types:
+            if ig_type in self.xml_tmp_str_type:
+                return True
+        return False
+
+    def _to_xml_check_allowed_types(self):
         for al_type in self.xml_allowed_types:
-            if al_type in tmp_type:
+            if al_type in self.xml_tmp_str_type:
                 return True
         return False
 
@@ -133,15 +130,6 @@ class XMLUtils(util.ObjectID):
 
 ################################################################################
 ##### List parsing
-    """
-
-            if "PVFreeInfo" in iter_type:
-                self._to_xml_parse_dict_iter(iterator.__dict__,
-                                             sublist[-1],
-                                             ["pv", "free", "size"],
-                                             "dict-")
-            """
-
     def _to_xml_parse_iterables(self, list_obj=None, par_elem=None, forced_atts=None):
         # Preparation
         dict_override = False
@@ -161,8 +149,18 @@ class XMLUtils(util.ObjectID):
         # Create sublist and start to iterate
         sublist = []
         counter = 0
+
+        if list_obj == [] or list_obj == {}:
+            return
+
         for item in list_obj:
             sublist.append(ET.SubElement(par_elem, "item"))
+
+            # Temporaily get str_type
+            self.xml_tmp_str_type = str(type(item)).split("'")[-2]
+            if self._to_xml_check_ign_types():
+                sublist[-1].text = "UNKNOWN: %s" % self.xml_tmp_str_type
+                continue
 
             # Preparation - if it is dictionary, we want to parse it first
             if dict_override:
@@ -213,30 +211,6 @@ class XMLUtils(util.ObjectID):
             getattr(self.xml_tmp_obj, "to_xml")()
         else:
             pass
-
-        """
-        # Create tempovary id to assign
-        temp_id = self._getdeepattr(self, in_attrib + ".id")
-        self.xml_elems_list[-1].text = str(temp_id)
-
-        # Determine if we want to parse or if it is duplicate
-        if temp_id not in self.xml_ids_done:
-            self.xml_ids_done.add(temp_id)
-
-            fmt = getattr(self, in_attrib)
-            fmt_full_name = str(type(fmt)).split("'")[1]
-            self.xml_elems_list.append(ET.SubElement(self.format_elems, fmt_full_name.split(".")[-1]))
-            self.xml_elems_list[-1].set("type", fmt_full_name)
-            self.xml_elems_list[-1].set("ObjectID", str(temp_id))
-
-            # Get uninitialized objects
-            exp_initer = self._getdeepattr(self, in_attrib + "._to_xml_init")
-
-            # Init basic init
-            exp_initer = exp_initer(self.xml_root_elem, format_override=True, xml_ids_done=self.xml_ids_done)
-            self._getdeepattr(self, in_attrib + ".to_xml")()
-        else:
-            pass"""
 
 ################################################################################
 ##### Set data
@@ -299,7 +273,10 @@ class XMLUtils(util.ObjectID):
 
         for attr in self.xml_attr_list:
             try:
+                # Temporaily get str_type
+                self.xml_tmp_str_type = str(type(getattr(self, attr))).split("'")[-2]
                 # Check, if it is allowed attrib or not
+                self._to_xml_get_data(attr)
                 if self._to_xml_check_igns(attr):
                     continue
                 # Basic fix - replace all underscore attrs with non-underscore
