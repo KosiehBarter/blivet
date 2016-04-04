@@ -158,9 +158,13 @@ class Blivet(object, metaclass=SynchronizedMeta):
         self.autopart_requests = []
         self.edd_dict = {}
 
+<<<<<<< HEAD
         self.ignored_disks = []
         self.exclusive_disks = []
         self.disk_images = {}
+=======
+        self.xml_file = xml_file
+>>>>>>> WIP: Fix for LVMCache
 
         self.__luks_devs = {}
         self.size_sets = []
@@ -180,13 +184,14 @@ class Blivet(object, metaclass=SynchronizedMeta):
 =======
         self.devicetree = DeviceTree(conf=self.config,
                                      passphrase=self.encryption_passphrase,
-                                     luks_dict=self.__luks_devs)
+                                     luks_dict=self.__luks_devs,
+                                     xml_file=self.xml_file)
         self.fsset = FSSet(self.devicetree)
 >>>>>>> New function: xml export and import
         self.roots = []
         self.services = set()
 
-    def to_xml(self, dump_device=None, custom_name=None, rec_bool=False):
+    def to_xml(self, dump_device=None, custom_name=None, rec_bool=False, test_run=False):
         """
             docstring
         """
@@ -194,6 +199,10 @@ class Blivet(object, metaclass=SynchronizedMeta):
 
         if rec_bool or dump_device is not None:
             selected_devs = xml_util.select_device(self.devices, dump_device, rec_bool)
+        elif test_run:
+            from . import export_test
+            selected_devs = export_test.vytvor_test()
+
         else:
             selected_devs = self.devices
 
