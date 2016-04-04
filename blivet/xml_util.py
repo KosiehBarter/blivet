@@ -15,7 +15,6 @@ def create_basics():
     root_elem = ET.Element("Blivet-XML-Tools")
     super_elems.append(ET.SubElement(root_elem, "Devices"))
     super_elems.append(ET.SubElement(root_elem, "Formats"))
-    super_elems.append(ET.SubElement(root_elem, "MiscDevices"))
     return (root_elem, super_elems)
 
 def save_file(root_elem, dump_device=None, custom_name=None, rec_bool=False):
@@ -82,7 +81,6 @@ class XMLUtils(util.ObjectID):
         self.xml_root_elem = root_elem
         self.device_elems = self.xml_root_elem[0]
         self.format_elems = self.xml_root_elem[1]
-        self.misc_elems = self.xml_root_elem[2]
         self.xml_iterables = {list, tuple, dict, "collections.OrderedDict"}
 
         # Determine, what object to parse
@@ -253,15 +251,14 @@ class XMLUtils(util.ObjectID):
         """
             Similar to format, this does the same like parse_format, but for devices.
         """
-        self.xml_elems_list.append(ET.SubElement(self.misc_elems,
-                                                 self.tmp_full_name.split(".")[-1]))
+        self.xml_elems_list[-1].text = None
         self.xml_elems_list[-1].set("type", self.tmp_full_name)
         self.xml_elems_list[-1].set("ObjectID", str(self.tmp_id))
 
         new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
         new_obj_init = new_obj_init(self.xml_root_elem,
                                         object_override=self.xml_tmp_obj,
-                                        parent_override=self.misc_elems[-1],
+                                        parent_override=self.xml_elems_list[-1],
                                         xml_done_ids=self.xml_done_ids)
         # Finally, start parsing
         getattr(self.xml_tmp_obj, "to_xml")()
