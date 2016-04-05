@@ -55,7 +55,6 @@ def export_iterate(device_list, super_elems, master_root_elem):
     """
     # Define basic types
     disk_elems = []
-    format_elems = []
 
     for dev in device_list:
         if hasattr(dev, "to_xml"):
@@ -65,7 +64,6 @@ def export_iterate(device_list, super_elems, master_root_elem):
             disk_elems[-1].set("ObjectID", str(getattr(dev, "id")))
             dev._to_xml_init(master_root_elem)
             dev.to_xml()
-
 
 ################################################################################
 ##### BASIC DEFINITION
@@ -220,12 +218,18 @@ class XMLUtils(util.ObjectID):
         if self.tmp_id not in self.xml_done_ids:
             self.xml_done_ids.add(self.tmp_id)
 
+            # Import all required
+            DeviceFormat = getattr(importlib.import_module("blivet.formats"), "DeviceFormat")
+            Device = getattr(importlib.import_module("blivet.devices"), "Device")
             # For DeviceFormat
-            if "format" in self.tmp_full_name:
+            if isinstance(self.xml_tmp_obj, DeviceFormat):
                 self._to_xml_parse_format()
+            # For Device
+            elif isinstance(self.xml_tmp_obj, Device):
+                return
             # Anything else
-            elif "LVMCache" in self.tmp_full_name:
-                self._to_xml_parse_device()
+            else:
+                self._to_xml_parse_object()
         # Skip it, when ID is in xml_done_ids
         else:
             pass
@@ -248,6 +252,17 @@ class XMLUtils(util.ObjectID):
         getattr(self.xml_tmp_obj, "to_xml")()
 
     def _to_xml_parse_device(self):
+        self.xml_elems_list[-1].set("type", self.tmp_full_name)
+        self.xml_elems_list[-1].set("ObjectID", str(self.tmp_id))
+
+        new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
+        new_obj_init = new_obj_init(self.xml_root_elem,
+                                    parent_override=self.device_elems[-1],
+                                    xml_done_ids=self.xml_done_ids)
+        # Finally, start parsing
+        getattr(self.xml_tmp_obj, "to_xml")()
+
+    def _to_xml_parse_object(self):
         """
             Similar to format, this does the same like parse_format, but for devices.
         """
@@ -323,8 +338,6 @@ class XMLUtils(util.ObjectID):
             This is the main function, that does the export.
             All of the above are subfunctions / methods, that are used by to_xml().
         """
-        end_hook = len(self.xml_attr_list)
-        hook_counter = 0
         for attr in self.xml_attr_list:
             try:
                 # Temporaily get str_type
@@ -335,6 +348,8 @@ class XMLUtils(util.ObjectID):
                 # Basic fix - replace all underscore attrs with non-underscore
                 if attr.startswith("_") and hasattr(self.xml_object, attr[1:]):
                     attr = attr[1:]
+                # Add to completed attributes, so we can avoid duplicates
+                self.xml_attrs_done.add(attr)
                 # Temporaily get object
                 self._to_xml_get_data(attr)
                 # Create basic element
@@ -353,10 +368,6 @@ class XMLUtils(util.ObjectID):
                 # Normal attribute
                 else:
                     self._to_xml_set_value(self.xml_elems_list[-1])
-                hook_counter = hook_counter + 1
-                if hook_counter >= end_hook + 1:
-                    if self.xml_hook:
-                        getattr(self.xml_hook, "to_xml")()
 
             except Exception as e:
                 check_issue = str(e)
