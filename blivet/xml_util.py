@@ -181,8 +181,7 @@ class XMLUtils(util.ObjectID):
                 item = list_obj.get(item)
 
             elif isinstance(self.xml_tmp_obj, tuple):
-                sublist[-1].set("origin", self.xml_tmp_str_type)
-                item = item.__dict__
+                item = dict(item.__dict__)
 
             # Reload data type
             self._to_xml_get_data(in_obj=item)
@@ -251,7 +250,6 @@ class XMLUtils(util.ObjectID):
             Special section for DeviceFormat
         """
         # Start adding elements to format section
-        self.xml_elems_list[-1].text = None
         self.xml_elems_list.append(ET.SubElement(self.format_elems,
                                                  self.tmp_full_name.split(".")[-1]))
         self.xml_elems_list[-1].set("type", self.tmp_full_name)
@@ -333,7 +331,8 @@ class XMLUtils(util.ObjectID):
         if hasattr(self.xml_tmp_obj, "id"):
             self.xml_tmp_str_type = "ObjectID"
         # Finally, set the type
-        par_elem.set("type", self.xml_tmp_str_type)
+        if par_elem.attrib.get("type") is None:
+            par_elem.set("type", self.xml_tmp_str_type)
 
 ################################################################################
 ##### Base element appending
@@ -389,7 +388,6 @@ class XMLUtils(util.ObjectID):
                     #print (e, attr, self.xml_tmp_obj)
                     #print("TRACEBACK")
                     #traceback.print_tb(e.__traceback__)
-                break
 
     def _getdeepattr(self, obj, name):
         """This behaves as the standard getattr, but supports
