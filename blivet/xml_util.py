@@ -181,6 +181,7 @@ class XMLUtils(util.ObjectID):
                 item = list_obj.get(item)
 
             elif isinstance(self.xml_tmp_obj, tuple):
+                sublist[-1].set("origin", self.xml_tmp_str_type)
                 item = item.__dict__
 
             # Reload data type
@@ -520,8 +521,9 @@ class FromXML(object):
 ################# Iterating ####################################################
     def _fxml_iterate_tree(self):
         for elem in self.fxml_source_list:
+            # Parses all possible data from elem and determine type
             self._fxml_get_elem_data(elem)
-            self._fxml_get_module()
+            self._fxml_determine_type()
 
 
     def _fxml_iterate_element(self):
@@ -535,7 +537,8 @@ class FromXML(object):
         """
             Type, that is simple and does not need anything else
         """
-        pass
+        simple_types = {"int": int, "float": float} # Note: str missing intentionally, parsed by default.
+
 
     def _fxml_get_type_iterable(self):
         """
@@ -553,7 +556,8 @@ class FromXML(object):
         """
             Determine type to correctly assign it
         """
-        pass
+        if "." in self.fxml_tmp_type_str:
+            self._fxml_get_module()
 
 ################################################################################
 """
@@ -581,29 +585,6 @@ class FromXML(object):
             self.obj_elements[-1].update(\{self.fxml_elem_attrib: self.fxml_elem_value\})
         else:
             self.obj_elements[-1].update(\{self.fxml_elem_attrib: None\})
-
-################################################################################
-################# Module handling ##############################################
-    def _fxml_parse_module(self):
-
-            This basically recreates full path to module and imports its class
-
-        tmp_type = self.fxml_elem_attrib.get("type")
-        # Check against dots
-        if "." not in tmp_type:
-            return
-        tmp_imp_path = ""
-
-        if self.fulltypes_stack.get((tmp_type)) is not None:
-
-
-
-
-
-        if self.fulltypes_stack.get(tmp_type) is None:
-
-        else:
-            return
 
 ################################################################################
 ################# ITERATE FUNCIONS #############################################
@@ -635,7 +616,7 @@ class FromXML(object):
             This function basically determines, what kind of type the value will be.
 
         ## Define basic types
-        basic_types = {"int": int, "float": float} ## Note: str missing intentionally, parsed by default.
+        basic_types =
         basic_values = {"True": True, "False": False}
         none_type = {"None": None}
 
