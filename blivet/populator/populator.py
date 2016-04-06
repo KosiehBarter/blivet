@@ -438,6 +438,16 @@ class PopulatorMixin(object, metaclass=SynchronizedMeta):
         parted.register_exn_handler(parted_exn_handler)
         try:
             self._populate()
+<<<<<<< HEAD
+=======
+=======
+            if self.xml_file is not None:
+                XMLImporter = xml_util.FromXML(self.xml_file)
+                XMLImporter.from_xml()
+            else:
+                self._populate()
+>>>>>>> Rebased to current master and fixed export
+>>>>>>> Readded init for XML import class
         except Exception:
             raise
         finally:
