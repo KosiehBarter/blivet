@@ -2,6 +2,10 @@ from . import util
 import xml.etree.ElementTree as ET
 from socket import gethostname
 import importlib
+from collections import namedtuple
+
+# debug
+import traceback
 
 ################################################################################
 ##### BASIC FUNCTIONS
@@ -15,6 +19,7 @@ def create_basics():
     root_elem = ET.Element("Blivet-XML-Tools")
     super_elems.append(ET.SubElement(root_elem, "Devices"))
     super_elems.append(ET.SubElement(root_elem, "Formats"))
+    super_elems.append(ET.SubElement(root_elem, "InternalDevices"))
     return (root_elem, super_elems)
 
 def save_file(root_elem, dump_device=None, custom_name=None, rec_bool=False):
@@ -62,13 +67,13 @@ def export_iterate(device_list, super_elems, master_root_elem):
             disk_elems.append(ET.SubElement(super_elems[0], dev_name.split(".")[-1]))
             disk_elems[-1].set("type", dev_name)
             disk_elems[-1].set("ObjectID", str(getattr(dev, "id")))
-            dev._to_xml_init(master_root_elem)
+            dev._to_xml_init(master_root_elem, devices_list=device_list)
             dev.to_xml()
 
 ################################################################################
 ##### BASIC DEFINITION
 class XMLUtils(util.ObjectID):
-    def _to_xml_init(self, root_elem, object_override=None,
+    def _to_xml_init(self, root_elem, devices_list=None, object_override=None,
                      parent_override=None, xml_done_ids=set()):
         """
             :param ET.Element root_elem: Root element of the XML file
@@ -77,15 +82,24 @@ class XMLUtils(util.ObjectID):
             :param set xml_done_ids: set of IDs that are done to prevent duplicates
         """
         self.xml_root_elem = root_elem
+        self.xml_devices_list = devices_list
         self.device_elems = self.xml_root_elem[0]
         self.format_elems = self.xml_root_elem[1]
-        self.xml_iterables = {list, tuple, dict, "collections.OrderedDict"}
+        self.intern_elems = self.xml_root_elem[2]
+        self.xml_iterables = {list, tuple, dict, "collections.OrderedDict",
+                              "blivet.devices.lib.ParentList"}
 
         # Determine, what object to parse
         if object_override is None:
             self.xml_object = self
         else:
             self.xml_object = object_override
+
+        if object_override is not None and\
+            "LVMLogicalVolumeDevice" in str(type(object_override)):
+            self.debug_print = True
+        else:
+            self.debug_print = False
 
         # Determine where to store new elements
         self.xml_parent_elem = parent_override
@@ -139,80 +153,61 @@ class XMLUtils(util.ObjectID):
                 return True
         return False
 
+    def _to_xml_check_ids(self):
+        self.xml_tmp_id = getattr(self.xml_object, "id")
+        if self.xml_tmp_id in self.xml_done_ids:
+            return True
+
 ################################################################################
 ##### List parsing
     def _to_xml_parse_iterables(self, list_obj=None,
-                                par_elem=None,
-                                forced_atts=None):
-        """ Parses anything, that can be iterated."""
-        # Preparation
-        dict_override = False
+                                par_elem=None):
+        """
+            Parses anything, that can be iterated
+        """
+        # Set basic, before we can start
+        sublist = []
         if list_obj is None:
             list_obj = self.xml_tmp_obj
         if par_elem is None:
             par_elem = self.xml_elems_list[-1]
 
-        # If the object is dictionary
-        if type(list_obj) is dict or forced_atts is not None:
-            dict_override = True
-
-        # If it is ParentList
-        elif "ParentList" in self.xml_tmp_str_type:
-            list_obj =  getattr(self.xml_tmp_obj, "items")
-
-        # Create sublist and start to iterate
-        sublist = []
-        counter = 0
-
-        if list_obj == [] or list_obj == {}:
-            return
-
         for item in list_obj:
             sublist.append(ET.SubElement(par_elem, "item"))
-
-            # Temporaily get str_type
-            self.xml_tmp_str_type = str(type(item)).split("'")[-2]
-            if self._to_xml_check_ign_types():
-                sublist[-1].text = "UNKNOWN: %s" % self.xml_tmp_str_type
-                continue
-
-            # Preparation - if it is dictionary, we want to parse it first
-            if dict_override:
+            self._to_xml_get_data(in_obj=item)
+            # Check for dict
+            if type(list_obj) is dict:
                 sublist[-1].set("attr", item)
-                # Special override - if we want just some of the attributes
-                if forced_atts is not None and type(forced_atts) is list:
-                    item = list_obj.get(forced_atts[counter])
-                    counter = counter + 1
-                else:
-                    item = list_obj.get(item)
+                item = list_obj.get(item)
 
-            # Get basics of the iterated item
+            elif isinstance(self.xml_tmp_obj, tuple):
+                item = item.__dict__
+
+            # Reload data type
             self._to_xml_get_data(in_obj=item)
             self._to_xml_set_data_type(sublist[-1])
-
-            # Special check for PVFreeInfo
-            if "PVFreeInfo" in self.xml_tmp_str_type:
-                item = item.__dict__
-                forced_atts = ["pv", "free", "size"]
-
-            # If it is another iterable
-            if type(item) in self.xml_iterables or\
-            str(type(item)).split("'")[-2] in self.xml_iterables:
-                self._to_xml_parse_iterables(list_obj=item,
-                                             par_elem=sublist[-1],
-                                             forced_atts=forced_atts)
+            # Check for any iterable
+            if self.xml_tmp_type in self.xml_iterables or self.xml_tmp_str_type in self.xml_iterables:
+                self._to_xml_parse_iterables(list_obj=self.xml_tmp_obj, par_elem=sublist[-1])
 
             else:
                 self._to_xml_set_value(sublist[-1])
+                if hasattr(self.xml_tmp_obj, "to_xml") and self.xml_tmp_obj not in self.xml_devices_list:
+                    self._to_xml_get_data(in_obj=self.xml_tmp_obj)
+                    self._to_xml_parse_device()
+
+
 ################################################################################
 ##### Parsing objects, that are under devices (mostly formats), that have to_xml
-    def _to_xml_parse_sub_to_xml(self):
+    def _to_xml_parse_sub_to_xml(self, parse_override=False, obj_override=None):
         """
             Parses a object, that also has to_xml() method. Basically it runs
             to_xml() on object has it.
         """
+        if obj_override is not None:
+            self.xml_tmp_obj = obj_override
         self._to_xml_set_data_type(self.xml_elems_list[-1])
-        self.tmp_id = self._to_xml_set_value(self.xml_elems_list[-1], obj_override=True)
+        self._to_xml_set_value(self.xml_elems_list[-1])
         self.tmp_full_name = str(type(self.xml_tmp_obj)).split("'")[1]
 
         if self.tmp_id not in self.xml_done_ids:
@@ -234,34 +229,6 @@ class XMLUtils(util.ObjectID):
         else:
             pass
 
-    def _to_xml_parse_format(self):
-        """
-            Special section for DeviceFormat
-        """
-        # Start adding elements to format section
-        self.xml_elems_list.append(ET.SubElement(self.format_elems,
-                                                 self.tmp_full_name.split(".")[-1]))
-        self.xml_elems_list[-1].set("type", self.tmp_full_name)
-        self.xml_elems_list[-1].set("ObjectID", str(self.tmp_id))
-
-        new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
-        new_obj_init = new_obj_init(self.xml_root_elem,
-                                    parent_override=self.format_elems[-1],
-                                    xml_done_ids=self.xml_done_ids)
-        # Finally, start parsing
-        getattr(self.xml_tmp_obj, "to_xml")()
-
-    def _to_xml_parse_device(self):
-        self.xml_elems_list[-1].set("type", self.tmp_full_name)
-        self.xml_elems_list[-1].set("ObjectID", str(self.tmp_id))
-
-        new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
-        new_obj_init = new_obj_init(self.xml_root_elem,
-                                    parent_override=self.device_elems[-1],
-                                    xml_done_ids=self.xml_done_ids)
-        # Finally, start parsing
-        getattr(self.xml_tmp_obj, "to_xml")()
-
     def _to_xml_parse_object(self):
         """
             Similar to format, this does the same like parse_format, but for devices.
@@ -278,6 +245,49 @@ class XMLUtils(util.ObjectID):
         # Finally, start parsing
         getattr(self.xml_tmp_obj, "to_xml")()
 
+    def _to_xml_parse_format(self):
+        """
+            Special section for DeviceFormat
+        """
+        # Start adding elements to format section
+        self.xml_elems_list[-1].text = None
+        self.xml_elems_list.append(ET.SubElement(self.format_elems,
+                                                 self.tmp_full_name.split(".")[-1]))
+        self.xml_elems_list[-1].set("type", self.tmp_full_name)
+        self.xml_elems_list[-1].set("ObjectID", str(self.tmp_id))
+
+        new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
+        new_obj_init = new_obj_init(self.xml_root_elem,
+                                    parent_override=self.format_elems[-1],
+                                    xml_done_ids=self.xml_done_ids)
+        # Finally, start parsing
+        getattr(self.xml_tmp_obj, "to_xml")()
+
+################################################################################
+###########x Special occasion of sub-to_xml
+    def _to_xml_parse_device(self):
+        """
+            Special section for any other device, that is not in blivet.devices
+        """
+        # Get basic data and ID
+        self.xml_tmp_id = getattr(self.xml_tmp_obj, "id")
+        if self.xml_tmp_id in self.xml_done_ids:
+            return
+        self.xml_done_ids.add(self.xml_tmp_id)
+        self.xml_elems_list.append(ET.SubElement(self.intern_elems, self.xml_tmp_str_type.split(".")[-1]))
+        self.xml_elems_list[-1].set("type", self.xml_tmp_str_type)
+        self.xml_elems_list[-1].set("ObjectID", str(self.xml_tmp_id))
+
+        new_obj_init = getattr(self.xml_tmp_obj, "_to_xml_init")
+        new_obj_init = new_obj_init(self.xml_root_elem,
+                                    parent_override=self.intern_elems[-1],
+                                    object_override=self.xml_tmp_obj,
+                                    devices_list=self.xml_devices_list,
+                                    xml_done_ids=self.xml_done_ids)
+        # Finally, start parsing
+        getattr(self.xml_tmp_obj, "to_xml")()
+
+
 ################################################################################
 ##### Set data
     def _to_xml_get_data(self, in_attrib=None, in_obj=None):
@@ -292,7 +302,7 @@ class XMLUtils(util.ObjectID):
         self.xml_tmp_type = type(self.xml_tmp_obj)
         self.xml_tmp_str_type = str(self.xml_tmp_type).split("'")[-2]
 
-    def _to_xml_set_value(self, par_elem, obj_override=False):
+    def _to_xml_set_value(self, par_elem):
         """
             This just sets the data's value into element text.
             If obj_override is True, the object is re-assigned back.
@@ -310,10 +320,9 @@ class XMLUtils(util.ObjectID):
         par_elem.text = str(self.xml_tmp_obj)
 
         # Dirty trick: re-assign object back
-        if tmp_obj is not None and obj_override:
-            tmp_id = self.xml_tmp_obj
-            self.xml_tmp_obj = tmp_obj
-            return tmp_id
+        tmp_id = self.xml_tmp_obj
+        self.xml_tmp_obj = tmp_obj
+        self.tmp_id = tmp_id
 
     def _to_xml_set_data_type(self, par_elem):
         """
@@ -341,14 +350,15 @@ class XMLUtils(util.ObjectID):
         for attr in self.xml_attr_list:
             try:
                 # Temporaily get str_type
-                self.xml_tmp_str_type = str(type(getattr(self.xml_object, attr))).split("'")[-2]
+                tmp_obj = getattr(self.xml_object, attr)
+                self.xml_tmp_str_type = str(type(tmp_obj)).split("'")[-2]
                 # Check, if it is allowed attrib or not
                 if self._to_xml_check_igns(attr):
                     continue
                 # Basic fix - replace all underscore attrs with non-underscore
                 if attr.startswith("_") and hasattr(self.xml_object, attr[1:]):
                     attr = attr[1:]
-                # Add to completed attributes, so we can avoid duplicates
+                # Add to completed attributes, so we can avoid duplicates. Also add ids
                 self.xml_attrs_done.add(attr)
                 # Temporaily get object
                 self._to_xml_get_data(attr)
@@ -358,8 +368,8 @@ class XMLUtils(util.ObjectID):
                 self._to_xml_set_data_type(self.xml_elems_list[-1])
 
                 # Anything that can be iterated
-                if self.xml_tmp_type in self.xml_iterables or\
-                "ParentList" in self.xml_tmp_str_type:
+                if (self.xml_tmp_type in self.xml_iterables and self.xml_tmp_obj is not None) or\
+                ("ParentList" in self.xml_tmp_str_type and self.xml_tmp_obj is not None):
                     self._to_xml_parse_iterables(self.xml_tmp_obj)
 
                 elif hasattr(self.xml_tmp_obj, "to_xml"):
@@ -374,9 +384,11 @@ class XMLUtils(util.ObjectID):
                 if "unreadable attribute" in check_issue or\
                     "can only be accessed" in check_issue:
                     continue
-                else:
-                    print (e, attr)
-                continue
+                #else:
+                    #print (e, attr, self.xml_tmp_obj)
+                    #print("TRACEBACK")
+                    #traceback.print_tb(e.__traceback__)
+                break
 
     def _getdeepattr(self, obj, name):
         """This behaves as the standard getattr, but supports
