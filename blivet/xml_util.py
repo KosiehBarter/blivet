@@ -48,7 +48,7 @@ def select_device(dev_list, dump_device, rec_bool):
     """
     selected_devs = []
     for dev in dev_list:
-        if dump_device in dev:
+        if dump_device in dev.name:
             selected_devs.append(dev)
             if rec_bool:
                 break
@@ -264,7 +264,7 @@ class XMLUtils(util.ObjectID):
         getattr(self.xml_tmp_obj, "to_xml")()
 
 ################################################################################
-###########x Special occasion of sub-to_xml
+########### Special occasion of sub-to_xml
     def _to_xml_parse_device(self):
         """
             Special section for any other device, that is not in blivet.devices
@@ -438,11 +438,13 @@ class FromXML(object):
         # Define XML File
         self.xml_file = xml_file
         # Get master trees
-        self.xml_tree_devices = None
-        self.xml_tree_formats = None
+        self.fxml_tree_devices = None
+        self.fxml_tree_formats = None
+        self.fxml_tree_interns = None
         # Lists to store devices to - Preparation
         self.fxml_devices = []
         self.fxml_formats = []
+        self.fxml_interns = []
         # Little optimalization: use dict to get object if its imported already
         self.fulltypes_stack = {}
         # Any iterables
@@ -456,28 +458,111 @@ class FromXML(object):
             dictionary.
         """
         self._fxml_parse_file()
-        self._fxml_iterate_tree()
-        print (self.fxml_devices)
 
+        # TODO: tempovary assign
+        self.fxml_source_list = self.fxml_tree_devices
+        self.fxml_dest_list = self.fxml_devices
+
+        self._fxml_iterate_tree()
 
 ################################################################################
 ################# TOOL FUNCIONS ################################################
     def _fxml_parse_file(self):
         """
-            Parses file and stores its trees into variables to be used later.
+            Parses a XML file and stores its trees into shared variables
+            ẗo be used later.
         """
         xml_tmp_root = ET.parse(self.xml_file).getroot()
-        self.xml_tree_devices = xml_tmp_root[0]
-        self.xml_tree_formats = xml_tmp_root[1]
+        self.fxml_tree_devices = xml_tmp_root[0]
+        self.fxml_tree_formats = xml_tmp_root[1]
+        self.fxml_tree_interns = xml_tmp_root[2]
 
-        self.obj_root = self.xml_tree_devices
-        self.obj_elements = self.fxml_devices
+    def _fxml_get_elem_data(self, in_elem):
+        """
+            Gets all information from a element.
+            :param ET.Element in_elem: Element to "parse"
+        """
+        self.fxml_tmp_value = in_elem.text
+        self.fxml_tmp_type_str = in_elem.attrib.get("type")
+        self.fxml_tmp_type = None
+        self.fxml_tmp_attr = in_elem.attrib.get("attr")
+        self.fxml_tmp_id = in_elem.attrib.get("ObjectID")
+
+    def _fxml_get_module(self):
+        """
+            Reconstructs the class based on type
+            Returns: uninitialized class
+        """
+        # Try to get type, if it is already in types dictionary
+        tmp_type = self.fulltypes_stack.get(self.fxml_tmp_type_str)
+        if tmp_type is not None:
+            self.fxml_tmp_type = tmp_type
+        else:
+            # If it fails, create one
+            tmp_imp_path = ""
+
+            # Iterate through the "fulltype" and get all that is everyhing before
+            # last dot. Also, make correct path
+            for mod_str in range(len(self.fxml_tmp_type_str.split(".")) - 1):
+                if tmp_imp_path == "":
+                    tmp_imp_path = self.fxml_tmp_type_str.split(".")[0]
+                else:
+                    tmp_imp_path = tmp_imp_path + "." + self.fxml_tmp_type_str.split(".")[mod_str]
+            # Create the class itself
+            tmp_mod_name = self.fxml_tmp_type_str.split(".")[-1]
+            # Create a tempovary object that we store later in fulltypes_stack
+            tmp_class_obj = getattr(importlib.import_module(tmp_imp_path), tmp_mod_name)
+            self.fulltypes_stack.update({tmp_type: tmp_class_obj})
+            self.fxml_tmp_type = tmp_class_obj
+
+
+################################################################################
+################# Iterating ####################################################
+    def _fxml_iterate_tree(self):
+        for elem in self.fxml_source_list:
+            self._fxml_get_elem_data(elem)
+            self._fxml_get_module()
+
+
+    def _fxml_iterate_element(self):
+        for elem in self.fxml_source_list:
+            pass
+        pass
+
+################################################################################
+################# Type parsing #################################################
+    def _fxml_get_type_simple(self):
+        """
+            Type, that is simple and does not need anything else
+        """
+        pass
+
+    def _fxml_get_type_iterable(self):
+        """
+            Any iterable type
+        """
+        pass
+
+    def _fxml_get_type_complex(self):
+        """
+            Any type, that is complex - has a dot in it
+        """
+        pass
+
+    def _fxml_determine_type(self):
+        """
+            Determine type to correctly assign it
+        """
+        pass
+
+################################################################################
+"""
 
     def _fxml_get_elem_data(self, elem, parent=False):
-        """
+
             :param ET.Element elem: Element to gather data from
             Gets all data from ET.Element.
-        """
+
         if parent:
             self.fxml_elem_current = elem # This is the element we are working on currently
             self.fxml_elem_attrib = elem.attrib
@@ -487,50 +572,45 @@ class FromXML(object):
         self.fxml_elem_value = elem.text
 
     def _fxml_assign_attrib(self):
-        """
+
             This does following: gets attribute name from element and assigns
             value from elem.text.
-        """
+
         if "." not in self.fxml_elem_type and self.fxml_elem_type not in self.fxml_iterables:
             self._fxml_get_simple_type()
-            self.obj_elements[-1].update({self.fxml_elem_attrib: self.fxml_elem_value})
+            self.obj_elements[-1].update(\{self.fxml_elem_attrib: self.fxml_elem_value\})
         else:
-            self.obj_elements[-1].update({self.fxml_elem_attrib: None})
+            self.obj_elements[-1].update(\{self.fxml_elem_attrib: None\})
 
 ################################################################################
 ################# Module handling ##############################################
     def _fxml_parse_module(self):
-        """
+
             This basically recreates full path to module and imports its class
-        """
+
         tmp_type = self.fxml_elem_attrib.get("type")
         # Check against dots
         if "." not in tmp_type:
             return
         tmp_imp_path = ""
 
-        # Iterate through the "fulltype" and get all that is everyhing before
-        # last dot. Also, make correct path
-        for mod_str in range(len(tmp_type.split(".")) - 1):
-            if tmp_imp_path == "":
-                tmp_imp_path = tmp_type.split(".")[0]
-            else:
-                tmp_imp_path = tmp_imp_path + "." + tmp_type.split(".")[mod_str]
-        tmp_mod_name = tmp_type.split(".")[-1]
-        # Create a tempovary object that we store later in fulltypes_stack
-        tmp_class_obj = getattr(importlib.import_module(tmp_imp_path), tmp_mod_name)
+        if self.fulltypes_stack.get((tmp_type)) is not None:
+
+
+
+
 
         if self.fulltypes_stack.get(tmp_type) is None:
-            self.fulltypes_stack.update({tmp_type: tmp_class_obj})
+
         else:
             return
 
 ################################################################################
 ################# ITERATE FUNCIONS #############################################
     def _fxml_iterate_tree(self):
-        """
+
             Iterate through the tree to get all elements.
-        """
+
 
         for elem in self.obj_root:
             self._fxml_get_elem_data(elem, True)
@@ -538,7 +618,7 @@ class FromXML(object):
 
             # Special - append class and id to dictionary
             self.obj_elements.append({"fxml_class": self.fulltypes_stack.get(self.fxml_elem_attrib.get("type")),
-                                     "id": self.fxml_elem_attrib.get("ObjectID")})
+                                     "xml_id": self.fxml_elem_attrib.get("ObjectID")})
             # Start parsing the attributes
             self._fxml_iterate_object()
 
@@ -551,9 +631,9 @@ class FromXML(object):
 ################################################################################
 ################# ATTRIBUTE TYPING FUNCIONS ####################################
     def _fxml_get_simple_type(self):
-        """
+
             This function basically determines, what kind of type the value will be.
-        """
+
         ## Define basic types
         basic_types = {"int": int, "float": float} ## Note: str missing intentionally, parsed by default.
         basic_values = {"True": True, "False": False}
@@ -578,10 +658,10 @@ class FromXML(object):
 ################################################################################
 ################# PARSING FUNCIONS #############################################
     def _obsolete_fxml_parse_basic_list(self, in_elem_list):
-        """
+
             This function gets an element that is a list. It loops trough it and
             returns just list filled (or empty) with values that are subelements
-        """
+
         temp_list = []
 
         for inc in in_elem_list:
@@ -596,10 +676,10 @@ class FromXML(object):
         return temp_list
 
     def _obsolete_fxml_parse_value(self, in_elem, in_list = None, index = None):
-        """
+
             Gets the data out of attr="" and <tag>VALUE</tag>. It basically determines
             if its a basic typed value or complex value.
-        """
+
 
 
         ## Define advanced attributes like parents, we want to skip them at the beginning
@@ -645,10 +725,10 @@ class FromXML(object):
         return res_value
 
     def _obsolete_fxml_parse_attrs(self, in_master_list, in_elem, index):
-        """
+
             This basically walks trough element tree and updates dictionary with
             attributes.
-        """
+
         ## Firstly, define what we want to skip for first time
         ignored_attrs = ["fulltype"]
 
@@ -677,9 +757,9 @@ class FromXML(object):
 ################################################################################
 ################# INIT FUNCIONS ################################################
     def _obsolete_fxml_init_class(self, in_master_list, list_index, forced_obj):
-        """
+
             This finally intializes class object
-        """
+
         temp_obj_str = in_master_list[list_index][0]
         temp_obj_dict = in_master_list[list_index][1]
         mod_path, mod_name = self._obsolete_fxml_parse_module(None, temp_obj_str)
@@ -737,10 +817,10 @@ class FromXML(object):
 ################################################################################
 ################# BASIC LOOP FUNCIONS ##########################################
     def _obsolete_fxml_loop_trough(self, in_master_list, in_master_elem, forced_obj):
-        """
+
             This function does the hard work - decides upon forced_obj to get
             specific object from in_master_list to set attributes on.
-        """
+
         counter = 0
         for inc in in_master_list:
             ## "disassemble" object into simpler, get name in this instance
@@ -756,13 +836,14 @@ class FromXML(object):
             counter += 1
 
     def _obsolete_fxml_get_basenames(self, in_master_elem, in_master_list):
-        """
+
             This function will get basic names of the elements. This name can be
             parsed into modules.
-        """
+
         for inc in in_master_elem:
-            in_master_list.append((inc[0].text, {}))
+            in_master_list.append((inc[0].text, \{\}))
             in_master_list[-1][1].update({"name": inc.attrib.get("name")})
             in_master_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
 ################################################################################
 ################################################################################
+"""
