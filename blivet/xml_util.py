@@ -95,12 +95,6 @@ class XMLUtils(util.ObjectID):
         else:
             self.xml_object = object_override
 
-        if object_override is not None and\
-            "LVMLogicalVolumeDevice" in str(type(object_override)):
-            self.debug_print = True
-        else:
-            self.debug_print = False
-
         # Determine where to store new elements
         self.xml_parent_elem = parent_override
         if self.xml_parent_elem is None:
@@ -446,8 +440,6 @@ class FromXML(object):
         self.fxml_interns = []
         # Little optimalization: use dict to get object if its imported already
         self.fulltypes_stack = {}
-        # Any iterables
-        self.fxml_iterables = {"list", "tuple", "dict"}
 
 ################################################################################
 ###################### Execute #################################################
@@ -462,7 +454,7 @@ class FromXML(object):
         self.fxml_source_list = self.fxml_tree_devices
         self.fxml_dest_list = self.fxml_devices
 
-        self._fxml_iterate_tree()
+        self._fxml_test_parse_one()
 
 ################################################################################
 ################# TOOL FUNCIONS ################################################
@@ -486,6 +478,7 @@ class FromXML(object):
         self.fxml_tmp_type = None
         self.fxml_tmp_attr = in_elem.attrib.get("attr")
         self.fxml_tmp_id = in_elem.attrib.get("ObjectID")
+        self.fxml_tmp_element = in_elem
 
     def _fxml_get_module(self):
         """
@@ -517,17 +510,35 @@ class FromXML(object):
 
 ################################################################################
 ################# Iterating ####################################################
+    def _fxml_test_parse_one(self):
+        """
+            Debug ONLY: Gets specified object and performs full parse
+        """
+        test_elem = self.fxml_source_list[0]
+        self._fxml_get_elem_data(test_elem)
+        self._fxml_determine_type()
+        self.fxml_devices.append({"class": self.fxml_tmp_type})
+        self._fxml_iterate_element(test_elem)
+        for inc in self.fxml_devices[0]:
+            print (inc, self.fxml_devices[0].get(inc))
+
+
     def _fxml_iterate_tree(self):
+        """
+            docstring
+        """
         for elem in self.fxml_source_list:
             # Parses all possible data from elem and determine type
             self._fxml_get_elem_data(elem)
             self._fxml_determine_type()
 
 
-    def _fxml_iterate_element(self):
-        for elem in self.fxml_source_list:
-            pass
-        pass
+    def _fxml_iterate_element(self, in_elem, list_parse=None):
+        for elem in in_elem:
+            self._fxml_get_elem_data(elem)
+            self._fxml_determine_type()
+            self.fxml_devices[-1].update({self.fxml_tmp_attr: self.fxml_tmp_value})
+
 
 ################################################################################
 ################# Type parsing #################################################
@@ -535,29 +546,82 @@ class FromXML(object):
         """
             Type, that is simple and does not need anything else
         """
+        # Define simple types and values
         simple_types = {"int": int, "float": float} # Note: str missing intentionally, parsed by default.
+        simple_values = {"True": True, "False": False, "None": None}
 
+        # Start typing
+        attr_type = simple_types.get(self.fxml_tmp_type_str)
+        if attr_type is None and self.fxml_tmp_type_str is not "str":
+            self.fxml_tmp_value = simple_values.get(self.fxml_tmp_value)
+        elif self.fxml_tmp_type_str is "str":
+            return
+        else:
+            self.fxml_tmp_value = attr_type(self.fxml_tmp_value)
 
     def _fxml_get_type_iterable(self):
         """
             Any iterable type
         """
-        pass
+        list_objects = {"list": list(), "dict": dict(), "set": set()}
+        # auto-assign type that we know
+        list_elem = list_objects.get(self.fxml_tmp_type_str)
+        tuple_tmp = self.fxml_tmp_type_str
+
+        # Start to iterate
+        for sub_elem in self.fxml_tmp_element:
+            # Get data about the sub_element
+            self._fxml_get_elem_data(sub_elem)
+            if type(list_elem) is dict and sub_elem.attrib.get("attr") is not None:
+                list_elem.update({sub_elem.attrib.get("attr"): self.fxml_tmp_value})
+            elif type(list_elem) is set:
+                list_elem.add(self.fxml_tmp_value)
+            else:
+                list_elem.append(self.fxml_tmp_value)
+
+            self._fxml_determine_type()
+
+        if tuple_tmp == "tuple":
+            self.fxml_tmp_value = tuple(self.fxml_tmp_value)
+        self.fxml_tmp_value = list_elem
+
+
 
     def _fxml_get_type_complex(self):
         """
             Any type, that is complex - has a dot in it
         """
+        self._fxml_get_module()
+
+        # TODO: Implement
+        if "size.Size" in self.fxml_tmp_type_str:
+            self.fxml_tmp_value = self.fxml_tmp_type(int(self.fxml_tmp_value))
+
+    def _fxml_get_obj_id(self):
         pass
+
 
     def _fxml_determine_type(self):
         """
             Determine type to correctly assign it
         """
-        if "." in self.fxml_tmp_type_str:
-            self._fxml_get_module()
+        iterables = {"list", "dict", "tuple"}
+        simples = {"str", "int", "float", "bool", "set", "tuple"}
+        complexes = {"blivet."}
+
+        if self.fxml_tmp_type_str in simples:
+            self._fxml_get_type_simple()
+        elif self.fxml_tmp_type_str in iterables:
+            self._fxml_get_type_iterable()
+        elif "." in self.fxml_tmp_type_str:
+            self._fxml_get_type_complex()
+        elif self.fxml_tmp_type_str == "ObjectID":
+            self._fxml_get_obj_id()
 
 ################################################################################
+################# XPath searching ##############################################
+    def _fxml_xpath_search(self, in_attr, in_str):
+        tmp = self.fxml_source_list.find("./*[@%s='%s']" % (in_attr, in_str))
 """
 
     def _fxml_get_elem_data(self, elem, parent=False):
@@ -615,7 +679,7 @@ class FromXML(object):
 
         ## Define basic types
         basic_types =
-        basic_values = {"True": True, "False": False}
+        basic_values =
         none_type = {"None": None}
 
         tmp_type = basic_types.get(self.fxml_elem_type)
