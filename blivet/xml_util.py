@@ -175,6 +175,8 @@ class XMLUtils(util.ObjectID):
                 item = list_obj.get(item)
 
             elif isinstance(self.xml_tmp_obj, tuple):
+                print (self.xml_tmp_str_type)
+                sublist[-1].set("type", str(type(item).split("'")[-2]))
                 item = dict(item.__dict__)
 
             # Reload data type
