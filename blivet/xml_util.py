@@ -4,6 +4,8 @@ from socket import gethostname
 import importlib
 from collections import namedtuple
 
+import pdb
+
 # debug
 import traceback
 
@@ -175,7 +177,7 @@ class XMLUtils(util.ObjectID):
                 item = list_obj.get(item)
 
             elif isinstance(self.xml_tmp_obj, tuple):
-                sublist[-1].set("orig-type", self.xml_tmp_str_type)
+                sublist[-1].set("type", self.xml_tmp_str_type)
                 item = dict(item.__dict__)
 
             # Reload data type
@@ -326,7 +328,8 @@ class XMLUtils(util.ObjectID):
         if hasattr(self.xml_tmp_obj, "id"):
             self.xml_tmp_str_type = "ObjectID"
         # Finally, set the type
-        par_elem.set("type", self.xml_tmp_str_type)
+        if par_elem.attrib.get("type") is None:
+            par_elem.set("type", self.xml_tmp_str_type)
 
 ################################################################################
 ##### Base element appending
@@ -422,7 +425,7 @@ class XMLUtils(util.ObjectID):
 ###################### IMPORT FUNCTIONS ########################################
 ###################### BASIC INITIALIZATION ####################################
 class FromXML(object):
-    def __init__(self, xml_file):
+    def __init__(self, xml_file=None):
         """
             Basic initialization
         """
@@ -440,6 +443,8 @@ class FromXML(object):
         self.fxml_interns = []
         # Little optimalization: use dict to get object if its imported already
         self.fulltypes_stack = {}
+        #
+        self.parents_objects = {}
 
 ################################################################################
 ###################### Execute #################################################
@@ -478,7 +483,7 @@ class FromXML(object):
         self.fxml_tmp_type_str = in_elem.attrib.get("type")
         self.fxml_tmp_type = None
         self.fxml_tmp_attr = in_elem.attrib.get("attr")
-        self.fxml_tmp_id = in_elem.attrib.get("ObjectID")
+        self.fxml_tmp_id = in_elem.text
         self.fxml_tmp_element = in_elem
 
     def _fxml_get_module(self):
@@ -515,13 +520,17 @@ class FromXML(object):
         """
             Debug ONLY: Gets specified object and performs full parse
         """
-        test_elem = self.fxml_tree_devices.find("./XMLTest")
+        TEST_CONSTANT = "./DiskDevice"
+
+        test_elem = self.fxml_tree_devices.find(TEST_CONSTANT)
         self._fxml_get_elem_data(test_elem)
         self._fxml_determine_type()
         self.fxml_devices.append({"class": self.fxml_tmp_type})
         self._fxml_iterate_element(test_elem)
-        for inc in self.fxml_devices[0]:
-            print (inc, self.fxml_devices[0].get(inc))
+
+        tmp_obj = self.fxml_devices[0].get("class")
+        pdb.set_trace()
+        tmp_obj.__init_xml__(self.fxml_devices[0])
 
 
     def _fxml_iterate_tree(self):
@@ -602,9 +611,14 @@ class FromXML(object):
         if "size.Size" in self.fxml_tmp_type_str:
             self.fxml_tmp_value = self.fxml_tmp_type(int(self.fxml_tmp_value))
 
-    def _fxml_set_obj_id(self, in_value):
-        tmp = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (in_value))
-        print (tmp)
+    def _fxml_set_obj_id(self):
+        """
+            Docstring
+        """
+        if self.parents_objects.get(self.fxml_tmp_id) is not None:
+            self.fxml_tmp_value = self.parents_objects.get(self.fxml_tmp_id)
+        else:
+            tmp = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (self.fxml_tmp_id))
 
 
     def _fxml_determine_type(self):
@@ -621,7 +635,7 @@ class FromXML(object):
         elif "." in self.fxml_tmp_type_str:
             self._fxml_set_type_complex()
         elif "ObjectID" in self.fxml_tmp_type_str:
-            self._fxml_set_obj_id(self.fxml_tmp_id)
+            self._fxml_set_obj_id()
         else:
             pass
 

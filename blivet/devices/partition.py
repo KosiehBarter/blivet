@@ -65,12 +65,43 @@ class PartitionDevice(StorageDevice):
     _type = "partition"
     _resizable = True
     default_size = DEFAULT_PART_SIZE
+    init_args = ["name", "fmt", "uuid", "size", "grow", "maxsize", "start", "end",
+                 "major", "minor", "bootable", "sysfs_path", "parents", "exists",
+                 "part_type", "primary", "weight", "block_size"]
+
+    @classmethod
+    def __init_xml__(self, xml_dict):
+        """
+            Universal method for initiating class object from XML.
+        """
+        init_dict = {}
+        for attr in self.init_args:
+            if attr == "fmt":
+                init_dict.update({"fmt": init_dict.get("format")})
+                del xml_dict["format"]
+            else:
+                init_dict.update({attr: xml_dict.get(attr)})
+                del xml_dict[attr]
+        class_inst = DiskDevice(**init_dict)
+
+        for attr in xml_dict:
+            if attr == "class":
+                continue
+            setattr(self, attr, xml_dict.get(attr))
+
+        xml_dict["class"] = class_inst
+
 
     def __init__(self, name, fmt=None, uuid=None,
                  size=None, grow=False, maxsize=None, start=None, end=None,
                  major=None, minor=None, bootable=None,
                  sysfs_path='', parents=None, exists=False,
+<<<<<<< HEAD
                  part_type=None, primary=False, weight=0):
+=======
+                 part_type=None, primary=False, weight=0,
+                 block_size=None, xml_import=False):
+>>>>>>> Futher advancement in XML Import
         """
             :param name: the device name (generally a device node's basename)
             :type name: str

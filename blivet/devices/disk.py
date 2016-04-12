@@ -56,6 +56,27 @@ class DiskDevice(StorageDevice):
     _type = "disk"
     _partitionable = True
     _is_disk = True
+    init_args = ["name", "fmt", "size", "major", "minor", "sysfs_path",
+                 "parents", "serial", "vendor", "model", "bus", "exists"]
+
+    @classmethod
+    def __init_xml__(self, xml_dict):
+        init_dict = {}
+        for attr in self.init_args:
+            if attr == "fmt":
+                init_dict.update({"fmt": init_dict.get("format")})
+                del xml_dict["format"]
+            else:
+                init_dict.update({attr: xml_dict.get(attr)})
+                del xml_dict[attr]
+        class_inst = DiskDevice(**init_dict)
+
+        for attr in xml_dict:
+            if attr == "class":
+                continue
+            setattr(self, attr, xml_dict.get(attr))
+
+        xml_dict["class"] = class_inst
 
     def __init__(self, name, fmt=None,
                  size=None, major=None, minor=None, sysfs_path='',
