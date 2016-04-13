@@ -425,55 +425,32 @@ class XMLUtils(util.ObjectID):
 ###################### IMPORT FUNCTIONS ########################################
 ###################### BASIC INITIALIZATION ####################################
 class FromXML(object):
-    def __init__(self, xml_file=None):
+    def __init__(self, xml_file):
         """
             Basic initialization
         """
         super(FromXML, self).__init__()
 
-        # Define XML File
-        self.xml_file = xml_file
         # Get master trees
-        self.fxml_tree_devices = None
-        self.fxml_tree_formats = None
-        self.fxml_tree_interns = None
+        self.fxml_tree_devices = ET.parse(xml_file).getroot()[0]
+        self.fxml_tree_formats = ET.parse(xml_file).getroot()[1]
+        self.fxml_tree_interns = ET.parse(xml_file).getroot()[2]
         # Lists to store devices to - Preparation
         self.fxml_devices = []
         self.fxml_formats = []
         self.fxml_interns = []
         # Little optimalization: use dict to get object if its imported already
         self.fulltypes_stack = {}
-        #
-        self.parents_objects = {}
 
-################################################################################
-###################### Execute #################################################
     def from_xml(self):
         """
             Populates a list with tuple containing class name and populated
             dictionary.
         """
-        self._fxml_parse_file()
-
-        # TODO: tempovary assign
-        self.fxml_source_list = self.fxml_tree_devices
-        self.fxml_dest_list = self.fxml_devices
-
-        self._fxml_test_parse_one()
+        pass
 
 ################################################################################
 ################# TOOL FUNCIONS ################################################
-    def _fxml_parse_file(self):
-        """
-            Parses a XML file and stores its trees into shared variables
-            ẗo be used later.
-        """
-        xml_tmp_root = ET.parse(self.xml_file).getroot()
-        self.fxml_tree_root = xml_tmp_root
-        self.fxml_tree_devices = xml_tmp_root[0]
-        self.fxml_tree_formats = xml_tmp_root[1]
-        self.fxml_tree_interns = xml_tmp_root[2]
-
     def _fxml_get_elem_data(self, in_elem):
         """
             Gets all information from a element.
@@ -481,7 +458,6 @@ class FromXML(object):
         """
         self.fxml_tmp_value = in_elem.text
         self.fxml_tmp_type_str = in_elem.attrib.get("type")
-        self.fxml_tmp_type = None
         self.fxml_tmp_attr = in_elem.attrib.get("attr")
         self.fxml_tmp_id = in_elem.text
         self.fxml_tmp_element = in_elem
@@ -511,7 +487,27 @@ class FromXML(object):
             # Create a tempovary object that we store later in fulltypes_stack
             tmp_class_obj = getattr(importlib.import_module(tmp_imp_path), tmp_mod_name)
             self.fulltypes_stack.update({tmp_type: tmp_class_obj})
-            self.fxml_tmp_type = tmp_class_obj
+            self.fxml_tmp_obj = tmp_class_obj
+
+# We want special class just for processing.
+# The reason is that we want shared information we read from FromXML.
+class FXMLProcess(FromXML):
+    def __init__(self, parent_override=None, dest_override=None):
+        """
+            Docstring
+        """
+        # Define where to parse from
+        self.fxml_source_list = parent_override
+        if self.fxml_source_list is None:
+            self.fxml_source_list = self.fxml_tree_devices
+        # Define where to store
+        self.fxml_dest_list = dest_override
+        if self.fxml_dest_list is None:
+            self.fxml_dest_list = self.fxml_devices
+
+    # TODO: DODELAT, mas novou architekturu, viz poznamky na papire
+
+
 
 
 ################################################################################
@@ -522,16 +518,18 @@ class FromXML(object):
         """
         TEST_CONSTANT = "./DiskDevice"
 
-        test_elem = self.fxml_tree_devices.find(TEST_CONSTANT)
+        if self.parent_override is None:
+            self.fxml_source_list = self.fxml_tree_devices
+        if self.dest_override is None:
+            self.fxml_dest_list = self.fxml_devices
+
+        test_elem = self.fxml_source_list.find(TEST_CONSTANT)
         self._fxml_get_elem_data(test_elem)
         self._fxml_determine_type()
-        self.fxml_devices.append({"class": self.fxml_tmp_type})
+        self.fxml_dest_list.append({"class": self.fxml_tmp_obj})
+        self.fxml_dest_list[-1].update({"ObjectID": self.fxml_tmp_id})
         self._fxml_iterate_element(test_elem)
-
-        tmp_obj = self.fxml_devices[0].get("class")
-        pdb.set_trace()
-        tmp_obj.__init_xml__(self.fxml_devices[0])
-
+        self._fxml_finalize_object()
 
     def _fxml_iterate_tree(self):
         """
@@ -543,11 +541,11 @@ class FromXML(object):
             self._fxml_determine_type()
 
 
-    def _fxml_iterate_element(self, in_elem, list_parse=None):
+    def _fxml_iterate_element(self, in_elem):
         for elem in in_elem:
             self._fxml_get_elem_data(elem)
             self._fxml_determine_type()
-            self.fxml_devices[-1].update({self.fxml_tmp_attr: self.fxml_tmp_value})
+            self.fxml_dest_list[-1].update({self.fxml_tmp_attr: self.fxml_tmp_value})
 
 
 ################################################################################
@@ -609,16 +607,28 @@ class FromXML(object):
 
         # TODO: Implement
         if "size.Size" in self.fxml_tmp_type_str:
-            self.fxml_tmp_value = self.fxml_tmp_type(int(self.fxml_tmp_value))
+            self.fxml_tmp_value = self.fxml_tmp_obj(int(self.fxml_tmp_value))
 
     def _fxml_set_obj_id(self):
         """
             Docstring
         """
-        if self.parents_objects.get(self.fxml_tmp_id) is not None:
-            self.fxml_tmp_value = self.parents_objects.get(self.fxml_tmp_id)
-        else:
-            tmp = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (self.fxml_tmp_id))
+        for item in self.fxml_source_list:
+            if item.get(self.fxml_tmp_id) is not None:
+                self.fxml_tmp_value = item.get(self.fxml_tmp_id)
+                return
+
+        tmp = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (self.fxml_tmp_id))
+        if "format" in tmp.attrib.get("type"):
+            format_instance = FromXML(parent_override=self.fxml_tree_formats,
+                                      dest_override=self.fxml_formats,
+                                      el_devices=self.fxml_tree_devices,
+                                      el_formats=self.fxml_tree_formats,
+                                      el_interns=self.fxml_tree_interns,
+                                      list_devices=self.fxml_devices,
+                                      list_formats=self.fxml_formats,
+                                      list_interns=self.fxml_interns,
+                                      fulltypes=self.fulltypes_stack)
 
 
     def _fxml_determine_type(self):
@@ -636,11 +646,12 @@ class FromXML(object):
             self._fxml_set_type_complex()
         elif "ObjectID" in self.fxml_tmp_type_str:
             self._fxml_set_obj_id()
-        else:
-            pass
 
 ################################################################################
-################# XPath searching ##############################################
+################# Final initialization #########################################
+    def _fxml_finalize_object(self):
+        tmp_obj = self.fxml_dest_list[-1].get("class")
+        tmp_obj.__init_xml__(self.fxml_dest_list[-1])
 
 """
 
