@@ -68,7 +68,7 @@ class DiskDevice(StorageDevice):
         init_dict = {}
         for attr in init_args:
             if attr == "fmt":
-                init_dict.update({"fmt": init_dict.get("format")})
+                init_dict["fmt"] = init_dict.get("format")
                 del xml_dict["format"]
             else:
                 init_dict.update({attr: xml_dict.get(attr)})
@@ -78,10 +78,14 @@ class DiskDevice(StorageDevice):
         for attr in xml_dict:
             if attr == "class":
                 continue
-            setattr(self, attr, xml_dict.get(attr))
-            del xml_dict[attr]
+            try:
+                setattr(class_inst, attr, xml_dict.get(attr))
+            except Exception as e:
+                continue
+            finally:
+                del xml_dict[attr]
 
-        xml_dict["class"] = class_inst
+        return class_inst
 
     def __init__(self, name, fmt=None,
                  size=None, major=None, minor=None, sysfs_path='',

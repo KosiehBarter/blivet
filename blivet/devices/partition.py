@@ -97,12 +97,8 @@ class PartitionDevice(StorageDevice):
                  size=None, grow=False, maxsize=None, start=None, end=None,
                  major=None, minor=None, bootable=None,
                  sysfs_path='', parents=None, exists=False,
-<<<<<<< HEAD
-                 part_type=None, primary=False, weight=0):
-=======
                  part_type=None, primary=False, weight=0,
                  block_size=None, xml_import=False):
->>>>>>> Futher advancement in XML Import
         """
             :param name: the device name (generally a device node's basename)
             :type name: str
@@ -161,15 +157,12 @@ class PartitionDevice(StorageDevice):
         self.req_end_sector = None
         self.req_name = None
 
-<<<<<<< HEAD
-=======
         self.start = start
         self.end = end
         self.block_size = block_size
         self.lenght = None
         self.xml_import = xml_import
 
->>>>>>> Functional draft for DiskDevice
         self._bootable = False
 
         # FIXME: Validate part_type, but only if this is a new partition
@@ -214,11 +207,10 @@ class PartitionDevice(StorageDevice):
                 # the only way to identify a BIOS Boot partition is to
                 # check the partition type/flags, so do it here.
                 self.format = get_format("biosboot", device=self.path, exists=True)
-<<<<<<< HEAD
-=======
+
         elif self.exists and not flags.testing and self.xml_import:
             self.lenght = self.end - self.start
->>>>>>> Functional draft for DiskDevice
+
         else:
             # XXX It might be worthwhile to create a shit-simple
             #     PartitionRequest class and pass one to this constructor
@@ -574,14 +566,10 @@ class PartitionDevice(StorageDevice):
         if not self.exists:
             return
 
-<<<<<<< HEAD
-        self._size = Size(self.parted_partition.getLength(unit="B"))
-=======
         if not self.xml_import:
             self._size = Size(self.parted_partition.getLength(unit="B"))
         else:
             self._size = Size(self.lenght * self.block_size)
->>>>>>> Functional draft for DiskDevice
         self.target_size = self._size
 
         self._part_type = self.parted_partition.type

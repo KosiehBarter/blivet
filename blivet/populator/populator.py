@@ -48,6 +48,7 @@ from ..static_data import lvs_info, pvs_info
 
 from .. import xml_util
 
+
 import logging
 log = logging.getLogger("blivet")
 
@@ -66,7 +67,7 @@ def parted_exn_handler(exn_type, exn_options, exn_msg):
 
 
 class PopulatorMixin(object, metaclass=SynchronizedMeta):
-    def __init__(self, passphrase=None, luks_dict=None, disk_images=None):
+    def __init__(self, passphrase=None, luks_dict=None, disk_images=None, xml_file=None):
         """
             :keyword passphrase: default LUKS passphrase
             :keyword luks_dict: a dict with UUID keys and passphrase values
@@ -75,7 +76,6 @@ class PopulatorMixin(object, metaclass=SynchronizedMeta):
             :type list: dict
 
         """
-
         self.xml_file = xml_file
         self.reset(passphrase=passphrase, luks_dict=luks_dict, disk_images=disk_images)
 
@@ -442,7 +442,7 @@ class PopulatorMixin(object, metaclass=SynchronizedMeta):
         parted.register_exn_handler(parted_exn_handler)
         try:
             if self.xml_file is not None:
-                XMLImporter = xml_util.FromXML(self.xml_file)
+                XMLImporter = xml_util.FromXML(self.xml_file, self)
                 XMLImporter.from_xml()
             else:
                 self._populate()
