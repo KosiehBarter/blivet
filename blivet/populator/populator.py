@@ -44,10 +44,17 @@ from ..flags import flags
 from ..storage_log import log_method_call
 from ..threads import SynchronizedMeta
 from .helpers import get_device_helper, get_format_helper
+<<<<<<< 89a524a6713a901e5fcac9730889b94e673c0dcf
 from ..static_data import lvs_info, pvs_info
 
 from .. import xml_util
 
+=======
+
+from ..static_data import lvs_info, pvs_info
+
+from .. import xml_util
+>>>>>>> ???
 
 import logging
 log = logging.getLogger("blivet")
@@ -76,6 +83,10 @@ class PopulatorMixin(object, metaclass=SynchronizedMeta):
             :type list: dict
 
         """
+<<<<<<< 89a524a6713a901e5fcac9730889b94e673c0dcf
+=======
+
+>>>>>>> ???
         self.xml_file = xml_file
         self.reset(passphrase=passphrase, luks_dict=luks_dict, disk_images=disk_images)
 
