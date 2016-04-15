@@ -179,6 +179,7 @@ class XMLUtils(util.ObjectID):
             elif isinstance(self.xml_tmp_obj, tuple):
                 sublist[-1].set("type", self.xml_tmp_str_type)
                 item = dict(item.__dict__)
+                sublist[-1].set("enforced", str(type(item)).split("'")[-2])
 
             # Reload data type
             self._to_xml_get_data(in_obj=item)
@@ -451,7 +452,7 @@ class FromXML(object):
             basic parsing.
         """
         # TEST OVERRIDE
-        self.fxml_tree_devices = [self.fxml_tree_devices[0]]
+        self.fxml_tree_devices = [self.fxml_tree_root.find(".//DiskDevice")]
 
         for dev_elem in self.fxml_tree_devices:
             tempovary_dict = {} # Create a tempovary dictionary to store data
@@ -469,30 +470,32 @@ class FromXML(object):
         """
             This function walks through the elements and parses them.
         """
-        ign_attrs = {"children", "ancestors"}
         # Not to be confused, we are walking through device's elems
         for attr_elem in dev_elem:
             # Get all possible basic data.
-            tmp_str_type = attr_elem.attrib.get("type")
-            tmp_value = attr_elem.text
             tmp_attrib = attr_elem.attrib.get("attr")
-            tmp_origin = attr_elem.attrib.get("origin") # Special override for some objects
-            # Do a check for ignored
-            if tmp_attrib in ign_attrs:
-                continue
+            tmp_str_type = attr_elem.attrib.get("type")
+            # Asign list to ignored attribute
+            if tmp_str_type == "list" and tmp_attrib != "parents"\
+                or tmp_attrib == "raw_device":
+                tmp_value = []
+            # Process other attributes if not
             else:
-                tmp_value = self._fxml_determine_type(attr_elem, tmp_str_type, tmp_value, tmp_attr)
-                tempovary_dict[tmp_attrib] = tmp_value
+                tmp_value = self._fxml_determine_type(attr_elem)
+            tempovary_dict[tmp_attrib] = tmp_value
 
 ################## Type parsing #################################################
-    def _fxml_set_type_simple(self, tmp_str_type, tmp_value):
+    def _fxml_process_simple(self, in_elem):
         """
-            Type, that is simple and does not need anything else
+            Processes simple values
         """
-        # Define simple types and values
+         # Define simple types and values
         simple_types = {"int": int, "float": float} # Note: str missing intentionally, parsed by default.
         simple_values = {"True": True, "False": False}
-
+        # "unpack" the element
+        tmp_str_type = in_elem.attrib.get("type")
+        tmp_value = in_elem.text
+        # First check type instances
         if simple_types.get(tmp_str_type) is not None:
             tmp_type = simple_types.get(tmp_str_type)
             tmp_value = tmp_type(tmp_value)
@@ -506,68 +509,101 @@ class FromXML(object):
             tmp_value = simple_values.get(tmp_value)
         return tmp_value
 
-    def _fxml_set_type_iterable(self, in_elem, tmp_str_type):
+    def _fxml_process_iterables(self, in_elem):
         """
             Any iterable type
         """
-        list_objects = {"list": list(), "dict": dict(), "set": set(), "tuple": []}
-        list_elem = list_objects.get(tmp_str_type)
+        # Define basics
+        list_objects = {"list": list(), "dict": dict(), "set": set(), "tuple": list()}
+        list_attribs = {"parents": list()}
+        # Unpack element
+        tmp_str_type = in_elem.attrib.get("type")
+        tmp_attr = in_elem.attrib.get("attr")
+        # Assign types
+        list_object = list_objects.get(tmp_str_type)
+        if list_object is None:
+            list_object = list_attribs.get(tmp_attr)
 
-        if in_elem.attrib.get("attr") == "parents":
-            list_elem = list()
+        # Finally, start iterating
+        for item_elem in in_elem: # Not to be confused, this element has children
+            tmp_value = self._fxml_determine_type(item_elem)
 
-        for elem in in_elem:
-            # Get basic data about the element
-            lst_tmp_str_type = elem.attrib.get("type")
-            lst_tmp_attr = elem.attrib.get("attr")
-            lst_tmp_value = elem.text
-            # Determine type
-            lst_tmp_value = self._fxml_determine_type(elem, lst_tmp_str_type, lst_tmp_value)
+            # Determine, which type of list to use
+            if type(list_object) is list:
+                list_object.append(tmp_value)
+            elif type(list_object) is dict:
+                lst_tmp_attr = item_elem.attrib.get("attr")
+                list_object[lst_tmp_attr] = tmp_value
+            elif type(list_object) is set:
+                list_object.add(tmp_value)
 
-            if type(list_elem) is list:
-                list_elem.append(lst_tmp_value)
-            elif type(list_elem) is dict:
-                list_elem.update({lst_tmp_attr: lst_tmp_value})
-            elif type(list_elem) is set:
-                list_elem.add(lst_tmp_value)
-
-        # Decide if it was tuple, or not
+        # Post-loop check for tuple
         if tmp_str_type == "tuple":
-            list_elem = tuple(list_elem)
-        # Finally, assign previous atribute and completed value
-        return list_elem
+            tmp_value = tuple(list_object)
+        return list_object
 
-    def _fxml_set_type_complex(self, tmp_str_type, tmp_value):
+    def _fxml_process_complex(self, elem):
         """
-            Any type, that is complex - has a dot in it
+            This processes any attribute, that is complex, ie has a dot in it.
         """
+        tmp_str_type = elem.attrib.get("type")
+        tmp_value = elem.text
         tmp_obj = self._fxml_get_module(tmp_str_type)
 
-        # TODO: Implement
-        if "size.Size" in tmp_str_type:
-            return tmp_obj(int(tmp_value))
+        if "Size" in tmp_str_type:
+            tmp_value = tmp_obj(int(tmp_value))
+        else:
+            tmp_enforced_type = elem.attrib.get("enforced")
+            if tmp_enforced_type is not None:
+                elem.set("type", tmp_enforced_type)
+            tmp_dict = self._fxml_determine_type(elem)
+            tmp_value = tmp_obj(**tmp_dict)
 
-    def _fxml_set_object(self, tmp_value):
-        tmp_elem = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (tmp_value))
-        print (tmp_elem, tmp_value)
+        return tmp_value
 
-    def _fxml_determine_type(self, elem, tmp_str_type, tmp_value, tmp_attr=None):
+    def _fxml_process_object(self, elem):
+        # Get ID first, then element
+        tmp_id = elem.text
+        tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (tmp_id))
+        # Get object's type and parse it
+        tmp_obj_type = tmp_element.attrib.get("type")
+        tmp_obj = self._fxml_get_module(tmp_obj_type)
+        # Create a dictionary for attributes
+        tmp_dict = {"class": tmp_obj}
+        # Parse attributes to dict
+        self.from_xml_internal(tmp_element, tmp_dict)
+        # Save object where it belongs.
+        print (tmp_obj)
+        tmp_value = tmp_obj.__init_xml__(tmp_dict)
+
+        return tmp_value
+
+    def _fxml_determine_type(self, in_elem):
         """
-            Gets and sets corrected typed value.
+            Decides, which subfunction to correctly type the attribute will be used
         """
+        # Define basics first
         iterables = {"list", "dict", "tuple"}
         simples = {"str", "int", "float", "bool"}
+        # unpack element
+        tmp_str_type = in_elem.attrib.get("type")
+
+        tmp_attr = in_elem.attrib.get("attr")
+        if tmp_attr is None:
+            tmp_attr = "dummy"
 
         if tmp_str_type in simples:
-            return self._fxml_set_type_simple(tmp_str_type, tmp_value)
-        elif "." in tmp_str_type and "ParentList" not in tmp_str_type:
-            return self._fxml_set_type_complex(tmp_str_type, tmp_value)
-        elif tmp_str_type in iterables or "ParentList" in tmp_str_type:
-            return self._fxml_set_type_iterable(elem, tmp_str_type)
-        elif "ObjectID" in tmp_str_type:
-            return self._fxml_set_object(tmp_value)
+            tmp_value = self._fxml_process_simple(in_elem)
+        elif tmp_str_type in iterables or "parents" in tmp_attr:
+            tmp_value = self._fxml_process_iterables(in_elem)
+        elif "." in tmp_str_type:
+            tmp_value =  self._fxml_process_complex(in_elem)
+        elif tmp_str_type == "ObjectID":
+            tmp_value = self._fxml_process_object(in_elem)
+        else:
+            tmp_value = None
 
-
+        return tmp_value
 
 ################################################################################
 ########### Tool functions #####################################################
@@ -597,6 +633,7 @@ class FromXML(object):
             tmp_class_obj = getattr(importlib.import_module(tmp_imp_path), tmp_mod_name)
             self.fulltypes_stack.update({tmp_str_type: tmp_class_obj})
             return tmp_class_obj
+
 
 #    def from_xml(self):
 #        """

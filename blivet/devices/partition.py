@@ -65,19 +65,20 @@ class PartitionDevice(StorageDevice):
     _type = "partition"
     _resizable = True
     default_size = DEFAULT_PART_SIZE
-    init_args = ["name", "fmt", "uuid", "size", "grow", "maxsize", "start", "end",
-                 "major", "minor", "bootable", "sysfs_path", "parents", "exists",
-                 "part_type", "primary", "weight", "block_size"]
 
     @classmethod
     def __init_xml__(self, xml_dict):
         """
-            Universal method for initiating class object from XML.
+            Gets attributes from XML dictionary and sets them as object
+            attributes
         """
+        init_args = ["name", "fmt", "uuid", "size", "grow", "maxsize", "start", "end",
+                     "major", "minor", "bootable", "sysfs_path", "parents", "exists",
+                     "part_type", "primary", "weight", "block_size"]
         init_dict = {}
-        for attr in self.init_args:
+        for attr in init_args:
             if attr == "fmt":
-                init_dict.update({"fmt": init_dict.get("format")})
+                init_dict["fmt"] = init_dict.get("format")
                 del xml_dict["format"]
             else:
                 init_dict.update({attr: xml_dict.get(attr)})
@@ -87,11 +88,12 @@ class PartitionDevice(StorageDevice):
         for attr in xml_dict:
             if attr == "class":
                 continue
-            setattr(self, attr, xml_dict.get(attr))
+            try:
+                setattr(class_inst, attr, xml_dict.get(attr))
+            except Exception as e:
+                continue
 
-        del xml_dict["class"]
-        xml_dict = {xml_dict.get("ObjectID"): class_inst}
-
+        return class_inst
 
     def __init__(self, name, fmt=None, uuid=None,
                  size=None, grow=False, maxsize=None, start=None, end=None,
