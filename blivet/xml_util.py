@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from socket import gethostname
 import importlib
 from collections import namedtuple
+import inspect
 
 import pdb
 
@@ -464,9 +465,8 @@ class FromXML(object):
             tempovary_dict["class"] = tmp_obj
             # Parse Device's attributes
             self.from_xml_internal(dev_elem,tempovary_dict)
-            print (tempovary_dict)
 
-    def from_xml_internal(self, dev_elem, tempovary_dict):
+    def from_xml_internal(self, dev_elem, tempovary_dict, ret_bool = False):
         """
             This function walks through the elements and parses them.
         """
@@ -483,6 +483,11 @@ class FromXML(object):
             else:
                 tmp_value = self._fxml_determine_type(attr_elem)
             tempovary_dict[tmp_attrib] = tmp_value
+
+        arg_list = self._fxml_get_class_args(tempovary_dict)
+        complete_object = self._fxml_finalize_object(tempovary_dict)
+        if ret_bool:
+            return complete_object
 
 ################## Type parsing #################################################
     def _fxml_process_simple(self, in_elem):
@@ -549,7 +554,7 @@ class FromXML(object):
         tmp_str_type = elem.attrib.get("type")
         tmp_value = elem.text
         tmp_obj = self._fxml_get_module(tmp_str_type)
-
+        # Special override for Size
         if "Size" in tmp_str_type:
             tmp_value = tmp_obj(int(tmp_value))
         else:
@@ -562,20 +567,27 @@ class FromXML(object):
         return tmp_value
 
     def _fxml_process_object(self, elem):
+        """
+            Gets and parses object from given ID.
+        """
         # Get ID first, then element
         tmp_id = elem.text
-        tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (tmp_id))
-        # Get object's type and parse it
-        tmp_obj_type = tmp_element.attrib.get("type")
-        tmp_obj = self._fxml_get_module(tmp_obj_type)
-        # Create a dictionary for attributes
-        tmp_dict = {"class": tmp_obj}
-        # Parse attributes to dict
-        self.from_xml_internal(tmp_element, tmp_dict)
-        # Save object where it belongs.
-        print (tmp_obj)
-        tmp_value = tmp_obj.__init_xml__(tmp_dict)
-
+        # First, check if we already have the ID we want
+        tmp_value = self.ids_done.get(tmp_id)
+        if tmp_value is None:
+            tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (tmp_id))
+            # Get object's type and parse it
+            tmp_obj_type = tmp_element.attrib.get("type")
+            tmp_obj = self._fxml_get_module(tmp_obj_type)
+            # Create a dictionary for attributes
+            tmp_dict = {"class": tmp_obj}
+            # Parse attributes to dict
+            complete_obj = self.from_xml_internal(tmp_element, tmp_dict, ret_bool=True)
+            self.ids_done[tmp_id] = complete_obj
+            tmp_value = complete_obj
+        else:
+            tmp_value = self.ids_done.get(tmp_id)
+        # At the end, do a devicetree check.
         return tmp_value
 
     def _fxml_determine_type(self, in_elem):
@@ -607,6 +619,17 @@ class FromXML(object):
 
 ################################################################################
 ########### Tool functions #####################################################
+    def _fxml_get_class_args(self, in_dict):
+        tmp_cls = in_dict.get("class")
+
+    def _fxml_finalize_object(self, in_dict):
+        """
+            From input dictionary, gets a object and initializes it
+        """
+        tmp_obj = in_dict.get("class")
+        tmp_value = tmp_obj.__init_xml__(in_dict)
+        return tmp_value
+
     def _fxml_get_module(self, tmp_str_type):
         """
             Reconstructs the class based on type

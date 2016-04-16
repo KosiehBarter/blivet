@@ -63,7 +63,6 @@ class DiskDevice(StorageDevice):
             Gets attributes from XML dictionary and sets them as object
             attributes
         """
-        # This is crucial, we need to specify attribs that are needed for init
         init_args = ["name", "fmt", "size", "major", "minor", "sysfs_path",
                      "parents", "serial", "vendor", "model", "bus", "exists"]
         init_dict = {}
@@ -71,7 +70,7 @@ class DiskDevice(StorageDevice):
         for attr in init_args:
             # Special for format, because we cannot set format, use fmt
             if attr == "fmt":
-                init_dict["fmt"] = init_dict.get("format")
+                init_dict["fmt"] = xml_dict.get("format")
                 del xml_dict["format"]
             # Any other attribute
             else:
