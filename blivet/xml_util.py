@@ -63,6 +63,7 @@ def export_iterate(device_list, super_elems, master_root_elem):
     """
     # Define basic types
     disk_elems = []
+    dev_counter = 0
 
     for dev in device_list:
         if hasattr(dev, "to_xml"):
@@ -72,6 +73,9 @@ def export_iterate(device_list, super_elems, master_root_elem):
             disk_elems[-1].set("ObjectID", str(getattr(dev, "id")))
             dev._to_xml_init(master_root_elem, devices_list=device_list)
             dev.to_xml()
+            dev_counter = dev_counter + 1
+    super_elems[0].set("Count", str(dev_counter))
+
 
 ################################################################################
 ##### BASIC DEFINITION
@@ -248,6 +252,13 @@ class XMLUtils(util.ObjectID):
         """
             Special section for DeviceFormat
         """
+        # Just a small tweak, count it
+        tmp_count = self.format_elems.attrib.get("Count")
+        if tmp_count is not None:
+            tmp_count = int(tmp_count) + 1
+        else:
+            tmp_count = 1
+        self.format_elems.set("Count", str(tmp_count))
         # Start adding elements to format section
         self.xml_elems_list.append(ET.SubElement(self.format_elems,
                                                  self.tmp_full_name.split(".")[-1]))
@@ -453,7 +464,7 @@ class FromXML(object):
             basic parsing.
         """
         # TEST OVERRIDE
-        self.fxml_tree_devices = [self.fxml_tree_root.find(".//DiskDevice")]
+        #self.fxml_tree_devices = [self.fxml_tree_root.find(".//PartitionDevice")]
 
         for dev_elem in self.fxml_tree_devices:
             tempovary_dict = {} # Create a tempovary dictionary to store data
@@ -463,10 +474,12 @@ class FromXML(object):
             # We know that it is complex type with dot
             tmp_obj = self._fxml_get_module(tmp_str_type)
             tempovary_dict["class"] = tmp_obj
+            tempovary_dict["XMLID"] = tmp_id
             # Parse Device's attributes
-            self.from_xml_internal(dev_elem,tempovary_dict)
+            complete_object = self.from_xml_internal(dev_elem, tempovary_dict)
+            self._fxml_check_device_tree(tempovary_dict, complete_object)
 
-    def from_xml_internal(self, dev_elem, tempovary_dict, ret_bool = False):
+    def from_xml_internal(self, dev_elem, tempovary_dict, ret_bool=False):
         """
             This function walks through the elements and parses them.
         """
@@ -484,10 +497,9 @@ class FromXML(object):
                 tmp_value = self._fxml_determine_type(attr_elem)
             tempovary_dict[tmp_attrib] = tmp_value
 
-        arg_list = self._fxml_get_class_args(tempovary_dict)
         complete_object = self._fxml_finalize_object(tempovary_dict)
-        if ret_bool:
-            return complete_object
+        # If we need to return the object back
+        return complete_object
 
 ################## Type parsing #################################################
     def _fxml_process_simple(self, in_elem):
@@ -581,10 +593,12 @@ class FromXML(object):
             tmp_obj = self._fxml_get_module(tmp_obj_type)
             # Create a dictionary for attributes
             tmp_dict = {"class": tmp_obj}
+            tmp_dict["XMLID"] = tmp_id
             # Parse attributes to dict
-            complete_obj = self.from_xml_internal(tmp_element, tmp_dict, ret_bool=True)
+            complete_obj = self.from_xml_internal(tmp_element, tmp_dict)
             self.ids_done[tmp_id] = complete_obj
             tmp_value = complete_obj
+            self._fxml_check_device_tree(tmp_dict, tmp_value)
         else:
             tmp_value = self.ids_done.get(tmp_id)
         # At the end, do a devicetree check.
@@ -619,9 +633,6 @@ class FromXML(object):
 
 ################################################################################
 ########### Tool functions #####################################################
-    def _fxml_get_class_args(self, in_dict):
-        tmp_cls = in_dict.get("class")
-
     def _fxml_finalize_object(self, in_dict):
         """
             From input dictionary, gets a object and initializes it
@@ -629,6 +640,15 @@ class FromXML(object):
         tmp_obj = in_dict.get("class")
         tmp_value = tmp_obj.__init_xml__(in_dict)
         return tmp_value
+
+    def _fxml_check_device_tree(self, in_dict, in_obj):
+        """
+            Uses ObjectID to check from which segment was device loaded
+        """
+        tmp_id = in_dict.get("XMLID")
+        result = self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (tmp_id)).tag
+        if result == "Devices":
+            self.devicetree._add_device(in_obj)
 
     def _fxml_get_module(self, tmp_str_type):
         """

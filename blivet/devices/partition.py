@@ -66,34 +66,38 @@ class PartitionDevice(StorageDevice):
     _resizable = True
     default_size = DEFAULT_PART_SIZE
 
-    @classmethod
-    def __init_xml__(self, xml_dict):
+    def __init_xml__(xml_dict):
         """
             Gets attributes from XML dictionary and sets them as object
             attributes
         """
+        # First, specify args
         init_args = ["name", "fmt", "uuid", "size", "grow", "maxsize", "start", "end",
                      "major", "minor", "bootable", "sysfs_path", "parents", "exists",
                      "part_type", "primary", "weight", "block_size"]
+        ignored_attrs = {"class", "XMLID"}
         init_dict = {}
-        for attr in init_args:
-            if attr == "fmt":
-                init_dict["fmt"] = init_dict.get("format")
-                del xml_dict["format"]
+
+        # Fill the init dictionary with data and clean them afterwards
+        for arg in init_args:
+            if arg == "fmt":
+                init_dict["fmt"] = xml_dict.get("format")
+                ignored_attrs.add("format")
             else:
-                init_dict.update({attr: xml_dict.get(attr)})
-                del xml_dict[attr]
-        class_inst = DiskDevice(**init_dict)
+                init_dict[arg] = xml_dict.get(arg)
+                ignored_attrs.add(arg)
 
+        cls_instance = PartitionDevice(**init_dict)
+        # Now, set all attributes we can set.
         for attr in xml_dict:
-            if attr == "class":
-                continue
             try:
-                setattr(class_inst, attr, xml_dict.get(attr))
-            except Exception as e:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
                 continue
 
-        return class_inst
+        return cls_instance
 
     def __init__(self, name, fmt=None, uuid=None,
                  size=None, grow=False, maxsize=None, start=None, end=None,

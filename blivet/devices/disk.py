@@ -57,37 +57,37 @@ class DiskDevice(StorageDevice):
     _partitionable = True
     _is_disk = True
 
-    @classmethod
-    def __init_xml__(self, xml_dict):
+    def __init_xml__(xml_dict):
         """
             Gets attributes from XML dictionary and sets them as object
             attributes
         """
+        # First, specify args
         init_args = ["name", "fmt", "size", "major", "minor", "sysfs_path",
                      "parents", "serial", "vendor", "model", "bus", "exists"]
+        ignored_attrs = {"class", "XMLID"}
         init_dict = {}
-        # Start "creating" init attribs
-        for attr in init_args:
-            # Special for format, because we cannot set format, use fmt
-            if attr == "fmt":
+
+        # Fill the init dictionary with data and clean them afterwards
+        for arg in init_args:
+            if arg == "fmt":
                 init_dict["fmt"] = xml_dict.get("format")
-                del xml_dict["format"]
-            # Any other attribute
+                ignored_attrs.add("format")
             else:
-                init_dict.update[attr] = xml_dict.get(attr)
-                del xml_dict[attr]
-        # Finally, init the class
-        class_inst = DiskDevice(**init_dict)
-        # Set attributes to the class
+                init_dict[arg] = xml_dict.get(arg)
+                ignored_attrs.add(arg)
+
+        cls_instance = DiskDevice(**init_dict)
+        # Now, set all attributes we can set.
         for attr in xml_dict:
-            if attr == "class":
-                continue
             try:
-                setattr(class_inst, attr, xml_dict.get(attr))
-            except Exception as e:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
                 continue
-        # And last, return it
-        return class_inst
+
+        return cls_instance
 
     def __init__(self, name, fmt=None,
                  size=None, major=None, minor=None, sysfs_path='',
