@@ -58,6 +58,26 @@ class BTRFSDevice(StorageDevice):
     _packages = ["btrfs-progs"]
     _external_dependencies = [availability.BLOCKDEV_BTRFS_PLUGIN]
 
+    def __init_xml__(xml_dict):
+        """
+            Gets attributes from XML dictionary and sets them as object
+            attributes
+        """
+        ignored_attrs = {"class", "XMLID"}
+        init_dict = {"parents": xml_dict.get("parents")}
+
+        cls_instance = BTRFSDevice({}, **init_dict)
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
+        return cls_instance
+
     def __init__(self, *args, **kwargs):
         """ Passing None or no name means auto-generate one like btrfs.%d """
         if not args or not args[0]:
@@ -161,6 +181,26 @@ class BTRFSVolumeDevice(BTRFSDevice, ContainerDevice, RaidDevice):
     vol_id = btrfs.MAIN_VOLUME_ID
     _format_class_name = property(lambda s: "btrfs")
     _format_uuid_attr = property(lambda s: "vol_uuid")
+
+    def __init_xml__(xml_dict):
+        """
+            Gets attributes from XML dictionary and sets them as object
+            attributes
+        """
+        ignored_attrs = {"class", "XMLID"}
+        init_dict = {}
+
+        cls_instance = BTRFSVolumeDevice(**init_dict)
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
+        return cls_instance
 
     def __init__(self, *args, **kwargs):
         """

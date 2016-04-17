@@ -121,7 +121,7 @@ class XMLUtils(util.ObjectID):
                               "XMLFormat"]
         self.xml_unallowed_types = ["parted.", "LVMCacheStats"]
         self.xml_ign_attrs = ["passphrase", "xml", "abc", "dependencies", "dict",
-                              "id"]
+                              "id", "_levels"]
 
 ################################################################################
 ##### Check ignored
@@ -464,7 +464,7 @@ class FromXML(object):
             basic parsing.
         """
         # TEST OVERRIDE
-        #self.fxml_tree_devices = [self.fxml_tree_root.find(".//PartitionDevice")]
+        #self.fxml_tree_devices = self.fxml_tree_root.findall(".//LVMVolumeGroupDevice")
 
         for dev_elem in self.fxml_tree_devices:
             tempovary_dict = {} # Create a tempovary dictionary to store data
@@ -522,6 +522,8 @@ class FromXML(object):
                 tmp_value = ""
             else:
                 pass
+        elif "." in tmp_str_type:
+            tmp_value = in_elem.text
         else:
             tmp_value = simple_values.get(tmp_value)
         return tmp_value
@@ -618,11 +620,11 @@ class FromXML(object):
         if tmp_attr is None:
             tmp_attr = "dummy"
 
-        if tmp_str_type in simples:
+        if tmp_str_type in simples or "blivet.devicelibs" in tmp_str_type:
             tmp_value = self._fxml_process_simple(in_elem)
         elif tmp_str_type in iterables or "parents" in tmp_attr:
             tmp_value = self._fxml_process_iterables(in_elem)
-        elif "." in tmp_str_type:
+        elif "." in tmp_str_type and "blivet.devicelibs" not in tmp_str_type:
             tmp_value =  self._fxml_process_complex(in_elem)
         elif tmp_str_type == "ObjectID":
             tmp_value = self._fxml_process_object(in_elem)
