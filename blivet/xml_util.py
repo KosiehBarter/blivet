@@ -499,10 +499,11 @@ class FromXML(object):
 
             # Special check for parents, we dont want to end forever in loop
             if tmp_str_type == "list" and tmp_attrib != "parents"\
+                or tmp_str_type == "list" and tmp_attrib != "_internal_lvs" \
                 or tmp_attrib == "raw_device":
                 tmp_value = []
             # Skip cached_lv, because we don't have it yet
-            elif tmp_attrib == "_cached_lv":
+            elif tmp_attrib == "_cached_lv" or tmp_attrib == "parent_lv":
                 tmp_value = None
             # Process other attributes if not
             else:
