@@ -336,6 +336,10 @@ class XMLUtils(util.ObjectID):
             self.xml_tmp_obj = getattr(self.xml_tmp_obj, "id")
         par_elem.text = str(self.xml_tmp_obj)
 
+        # We dont want parted, give at least info that we processed it
+        if "parted." in self.xml_tmp_str_type:
+            par_elem.text = "NOT IMPLEMENTED %s" % (self.xml_tmp_str_type)
+
         # Dirty trick: re-assign object back
         tmp_id = self.xml_tmp_obj
         self.xml_tmp_obj = tmp_obj
@@ -458,8 +462,7 @@ class FromXML(object):
         self.fxml_tree_formats = self.fxml_tree_root.find("./Formats")
         self.fxml_tree_interns = self.fxml_tree_root.find("./InternalDevices")
         # Lists to store devices to - Preparation
-        # TODO: primo do devicetree
-        self.ids_done = {} # ID = klic, hodnota = hotovy bliveti objekt
+        self.ids_done = {}
         # Little optimalization: use dict to get object if its imported already
         self.fulltypes_stack = {}
         # Define devicetree / populator
@@ -490,6 +493,11 @@ class FromXML(object):
         """
             This function walks through the elements and parses them.
         """
+        # Check if the object is already completed
+        tmp_id = dev_elem.attrib.get("ObjectID")
+        if self.ids_done.get(tmp_id) is not None:
+            return self.ids_done.get(tmp_id)
+
         # Not to be confused, we are walking through device's elems
         for attr_elem in dev_elem:
             # Get all possible basic data.
@@ -645,16 +653,23 @@ class FromXML(object):
         if tmp_attr is None:
             tmp_attr = "dummy"
 
+        # Anything, that is a simple attribute
         if tmp_str_type in simples or "blivet.devicelibs" in tmp_str_type:
             tmp_value = self._fxml_process_simple(in_elem)
+        # Aany iterable including parents
         elif tmp_str_type in iterables or "parents" in tmp_attr:
             tmp_value = self._fxml_process_iterables(in_elem)
+        # Any complicated type that can be loaded
         elif "." in tmp_str_type and "blivet.device" not in tmp_str_type:
             tmp_value =  self._fxml_process_complex(in_elem)
-        elif in_elem.attrib.get("ObjectID") is not None:
+        # Special object that has no separate segment
+        elif in_elem.attrib.get("ObjectID") is not None and\
+            self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (in_elem.attrib.get("ObjectID"))).tag == "Devices":
             tmp_value = self._fxml_process_object_inelem(in_elem)
+        # Any ID that refers to a object
         elif tmp_str_type == "ObjectID":
             tmp_value = self._fxml_process_object(in_elem)
+        # Anything else
         else:
             tmp_value = None
 
