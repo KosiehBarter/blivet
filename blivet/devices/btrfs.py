@@ -64,9 +64,9 @@ class BTRFSDevice(StorageDevice):
             attributes
         """
         ignored_attrs = {"class", "XMLID"}
-        init_dict = {"parents": xml_dict.get("parents")}
+        init_dict = {}
 
-        cls_instance = BTRFSDevice({}, **init_dict)
+        cls_instance = BTRFSDevice(parents=xml_dict.get("parents"), **init_dict)
         # Now, set all attributes we can set.
         for attr in xml_dict:
             try:

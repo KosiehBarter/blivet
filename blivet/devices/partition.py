@@ -87,6 +87,8 @@ class PartitionDevice(StorageDevice):
                 init_dict[arg] = xml_dict.get(arg)
                 ignored_attrs.add(arg)
 
+        init_dict["xml_import"] = True
+
         cls_instance = PartitionDevice(**init_dict)
         # Now, set all attributes we can set.
         for attr in xml_dict:
@@ -196,9 +198,12 @@ class PartitionDevice(StorageDevice):
         #        For existing partitions we will get the size from
         #        parted.
 
-        if self.exists and not flags.testing:
+        if self.exists and not flags.testing and not self.xml_import:
             log.debug("looking up parted Partition: %s", self.path)
             self._parted_partition = self.disk.format.parted_disk.getPartitionByPath(self.path)
+            self.start = self._parted_partition.geometry.start
+            self.end = self._parted_partition.geometry.end
+            self.lenght = self.end - self.start
             if not self._parted_partition:
                 raise errors.DeviceError("cannot find parted partition instance", self.name)
 
