@@ -588,6 +588,37 @@ class LVMLogicalVolumeBase(DMDevice, RaidDevice):
     _packages = ["lvm2"]
     _external_dependencies = [availability.BLOCKDEV_LVM_PLUGIN]
 
+    def __init_xml__(xml_dict):
+        """
+            Gets attributes from XML dictionary and sets them as object
+            attributes
+        """
+        # First, specify args
+        init_args = ["name", "parents", "size", "uuid", "seg_type", "fmt",
+                     "exists", "sysfs_path", "grow", "maxsize", "percent",
+                     "cache_request", "pvs"]
+        ignored_attrs = {"class", "XMLID"}
+        init_dict = {}
+
+        # Fill the init dictionary with data and clean them afterwards
+        for arg in init_args:
+            if arg == "fmt":
+                init_dict["fmt"] = xml_dict.get("format")
+                ignored_attrs.add("format")
+            else:
+                init_dict[arg] = xml_dict.get(arg)
+                ignored_attrs.add(arg)
+
+        cls_instance = LVMLogicalVolumeBase(**init_dict)
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
     def __init__(self, name, parents=None, size=None, uuid=None, seg_type=None,
                  fmt=None, exists=False, sysfs_path='', grow=None, maxsize=None,
                  percent=None, cache_request=None, pvs=None):
@@ -2050,6 +2081,37 @@ class LVMLogicalVolumeDevice(LVMLogicalVolumeBase, LVMInternalLogicalVolumeMixin
 class LVMCache(Cache, xml_util.XMLUtils):
 
     """Class providing the cache-related functionality of a cached LV"""
+
+    def __init_xml__(xml_dict):
+        """
+            Gets attributes from XML dictionary and sets them as object
+            attributes
+        """
+        # First, specify args
+        init_args = ["cached_lv", "size", "md_size", "exists", "pvs", "mode"]
+        ignored_attrs = {"class", "XMLID"}
+        init_dict = {}
+
+        # Fill the init dictionary with data and clean them afterwards
+        for arg in init_args:
+            if arg == "fmt":
+                init_dict["fmt"] = xml_dict.get("format")
+                ignored_attrs.add("format")
+            else:
+                init_dict[arg] = xml_dict.get(arg)
+                ignored_attrs.add(arg)
+
+        cls_instance = LVMCache(**init_dict)
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
+        return cls_instance
 
     def __init__(self, cached_lv, size=None, md_size=None, exists=False, pvs=None, mode=None):
         """

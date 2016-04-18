@@ -64,9 +64,7 @@ class BTRFSDevice(StorageDevice):
             attributes
         """
         ignored_attrs = {"class", "XMLID"}
-        init_dict = {}
-
-        cls_instance = BTRFSDevice(parents=xml_dict.get("parents"), **init_dict)
+        cls_instance = BTRFSDevice(parents=xml_dict.get("parents"))
         # Now, set all attributes we can set.
         for attr in xml_dict:
             try:
@@ -80,6 +78,9 @@ class BTRFSDevice(StorageDevice):
 
     def __init__(self, *args, **kwargs):
         """ Passing None or no name means auto-generate one like btrfs.%d """
+        # First get the kwarg if we import from XML
+        if kwargs.get("xml_dict") is not None:
+            kwargs = kwargs.get("xml_dict")
         if not args or not args[0]:
             args = ("btrfs.%d" % self.id,)
 
@@ -188,9 +189,8 @@ class BTRFSVolumeDevice(BTRFSDevice, ContainerDevice, RaidDevice):
             attributes
         """
         ignored_attrs = {"class", "XMLID"}
-        init_dict = {}
 
-        cls_instance = BTRFSVolumeDevice(**init_dict)
+        cls_instance = BTRFSVolumeDevice(parents=xml_dict.get("parents"))
         # Now, set all attributes we can set.
         for attr in xml_dict:
             try:
@@ -219,6 +219,8 @@ class BTRFSVolumeDevice(BTRFSDevice, ContainerDevice, RaidDevice):
         """
         # pop these arguments before the constructor call to avoid
         # unrecognized keyword error in superclass constructor
+        if kwargs.get("xml_dict") is not None:
+            kwargs = kwargs.get("xml_dict")
         data_level = kwargs.pop("data_level", None)
         metadata_level = kwargs.pop("metadata_level", None)
         create_options = kwargs.pop("create_options", None)
@@ -503,6 +505,19 @@ class BTRFSSubVolumeDevice(BTRFSDevice):
     """ A btrfs subvolume pseudo-device. """
     _type = "btrfs subvolume"
     _format_immutable = True
+
+    def __init_xml__(xml_dict):
+        cls_instance = BTRFSVolumeDevice()
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
+        return cls_instance
 
     def __init__(self, *args, **kwargs):
         """

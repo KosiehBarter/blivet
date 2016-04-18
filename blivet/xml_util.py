@@ -115,10 +115,9 @@ class XMLUtils(util.ObjectID):
 
         # Subsection for allowed attributes and types
         self.xml_allowed_types = ["str", "int", "float", "set", "dict", "list",
-                              "blivet.size.Size", "tuple", "bool", "NoneType",
-                              "complex", "blivet.devices.",
-                              "blivet.formats.", "blivet.devicelibs.",
-                              "XMLFormat"]
+                                  "blivet.size.Size", "tuple", "bool", "NoneType",
+                                  "complex", "blivet.devices.", "blivet.formats.",
+                                  "blivet.devicelibs.", "XMLFormat"]
         self.xml_unallowed_types = ["parted.", "LVMCacheStats"]
         self.xml_ign_attrs = ["passphrase", "xml", "abc", "dependencies", "dict",
                               "id", "_levels"]
@@ -282,6 +281,15 @@ class XMLUtils(util.ObjectID):
         self.xml_tmp_id = getattr(self.xml_tmp_obj, "id")
         if self.xml_tmp_id in self.xml_done_ids:
             return
+
+        # Just a small tweak, count it
+        tmp_count = self.intern_elems.attrib.get("Count")
+        if tmp_count is not None:
+            tmp_count = int(tmp_count) + 1
+        else:
+            tmp_count = 1
+        self.intern_elems.set("Count", str(tmp_count))
+        # Finally, start preparing
         self.xml_done_ids.add(self.xml_tmp_id)
         self.xml_elems_list.append(ET.SubElement(self.intern_elems, self.xml_tmp_str_type.split(".")[-1]))
         self.xml_elems_list[-1].set("type", self.xml_tmp_str_type)
@@ -446,9 +454,9 @@ class FromXML(object):
         # TODO: Predelat na XPath
         # Get master trees
         self.fxml_tree_root = ET.parse(xml_file).getroot()
-        self.fxml_tree_devices = self.fxml_tree_root[0]
-        self.fxml_tree_formats = self.fxml_tree_root[1]
-        self.fxml_tree_interns = self.fxml_tree_root[2]
+        self.fxml_tree_devices = self.fxml_tree_root.find("./Devices")
+        self.fxml_tree_formats = self.fxml_tree_root.find("./Formats")
+        self.fxml_tree_interns = self.fxml_tree_root.find("./InternalDevices")
         # Lists to store devices to - Preparation
         # TODO: primo do devicetree
         self.ids_done = {} # ID = klic, hodnota = hotovy bliveti objekt
@@ -476,8 +484,7 @@ class FromXML(object):
             tempovary_dict["class"] = tmp_obj
             tempovary_dict["XMLID"] = tmp_id
             # Parse Device's attributes
-            complete_object = self.from_xml_internal(dev_elem, tempovary_dict)
-            self._fxml_check_device_tree(tempovary_dict, complete_object)
+            self.from_xml_internal(dev_elem, tempovary_dict)
 
     def from_xml_internal(self, dev_elem, tempovary_dict, ret_bool=False):
         """
@@ -489,9 +496,14 @@ class FromXML(object):
             tmp_attrib = attr_elem.attrib.get("attr")
             tmp_str_type = attr_elem.attrib.get("type")
             # Asign list to ignored attribute
+
+            # Special check for parents, we dont want to end forever in loop
             if tmp_str_type == "list" and tmp_attrib != "parents"\
                 or tmp_attrib == "raw_device":
                 tmp_value = []
+            # Skip cached_lv, because we don't have it yet
+            elif tmp_attrib == "_cached_lv":
+                tmp_value = None
             # Process other attributes if not
             else:
                 tmp_value = self._fxml_determine_type(attr_elem)
@@ -499,9 +511,10 @@ class FromXML(object):
 
         complete_object = self._fxml_finalize_object(tempovary_dict)
         # If we need to return the object back
+        # TODO: ZKUS PRIDAT CHECKY NA CHILDREN, ANCESTORS, CACHE..
         return complete_object
 
-################## Type parsing #################################################
+################## Type parsing ################################################
     def _fxml_process_simple(self, in_elem):
         """
             Processes simple values
@@ -600,10 +613,21 @@ class FromXML(object):
             complete_obj = self.from_xml_internal(tmp_element, tmp_dict)
             self.ids_done[tmp_id] = complete_obj
             tmp_value = complete_obj
-            self._fxml_check_device_tree(tmp_dict, tmp_value)
         else:
             tmp_value = self.ids_done.get(tmp_id)
         # At the end, do a devicetree check.
+        return tmp_value
+
+    def _fxml_process_object_inelem(self, in_elem):
+        """
+            Process any object that has ObjectID, but not in separate segment
+        """
+        tmp_str_type = in_elem.attrib.get("type")
+        tmp_obj = self._fxml_get_module(tmp_str_type)
+        tmp_dict = {"class": tmp_obj}
+        tmp_dict["XMLID"] = in_elem.attrib.get("ObjectID")
+
+        tmp_value = self.from_xml_internal(in_elem, tmp_dict)
         return tmp_value
 
     def _fxml_determine_type(self, in_elem):
@@ -624,8 +648,10 @@ class FromXML(object):
             tmp_value = self._fxml_process_simple(in_elem)
         elif tmp_str_type in iterables or "parents" in tmp_attr:
             tmp_value = self._fxml_process_iterables(in_elem)
-        elif "." in tmp_str_type and "blivet.devicelibs" not in tmp_str_type:
+        elif "." in tmp_str_type and "blivet.device" not in tmp_str_type:
             tmp_value =  self._fxml_process_complex(in_elem)
+        elif in_elem.attrib.get("ObjectID") is not None:
+            tmp_value = self._fxml_process_object_inelem(in_elem)
         elif tmp_str_type == "ObjectID":
             tmp_value = self._fxml_process_object(in_elem)
         else:
@@ -639,18 +665,19 @@ class FromXML(object):
         """
             From input dictionary, gets a object and initializes it
         """
+        # First get data about the object we want to construct
         tmp_obj = in_dict.get("class")
-        tmp_value = tmp_obj.__init_xml__(in_dict)
-        return tmp_value
-
-    def _fxml_check_device_tree(self, in_dict, in_obj):
-        """
-            Uses ObjectID to check from which segment was device loaded
-        """
         tmp_id = in_dict.get("XMLID")
+        # init the obj and set its attributes
+        tmp_value = tmp_obj.__init_xml__(in_dict)
         result = self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (tmp_id)).tag
-        if result == "Devices":
-            self.devicetree._add_device(in_obj)
+
+        if self.ids_done.get(tmp_id) is None:
+            self.ids_done[tmp_id] = tmp_value
+            if result == "Devices":
+                self.devicetree._add_device(tmp_value)
+
+        return tmp_value
 
     def _fxml_get_module(self, tmp_str_type):
         """
@@ -819,7 +846,7 @@ class FromXML(object):
 ##
 ##            # Special - append class and id to dictionary
 ##            self.obj_elements.append({"fxml_class": self.fulltypes_stack.get(self.fxml_elem_attrib.get("type")),
-##                                     "xml_id": self.fxml_elem_attrib.get("ObjectID")})
+##                                     "XMLID": self.fxml_elem_attrib.get("ObjectID")})
 ##            # Start parsing the attributes
 ##            self._fxml_iterate_object()
 ##
@@ -952,7 +979,7 @@ class FromXML(object):
 ##
 ##    def _obsolete_fxml_get_child_id(self, in_id):
 ##        for inc in self.format_list:
-##            if in_id == inc[1].get("xml_id"):
+##            if in_id == inc[1].get("XMLID"):
 ##                return inc[2]
 ##
 ##################################################################################
@@ -1044,7 +1071,7 @@ class FromXML(object):
 ##        for inc in in_master_elem:
 ##            in_master_list.append((inc[0].text, \{\}))
 ##            in_master_list[-1][1].update({"name": inc.attrib.get("name")})
-##            in_master_list[-1][1].update({"xml_id": int(inc.attrib.get("id"))})
+##            in_master_list[-1][1].update({"XMLID": int(inc.attrib.get("id"))})
 ##################################################################################
 ##################################################################################
 ##"""

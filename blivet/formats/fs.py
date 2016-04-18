@@ -826,6 +826,25 @@ class BTRFS(FS):
     # partition table type correctly for btrfs partitions
     # parted_system = fileSystemType["btrfs"]
 
+    def __init_xml__(xml_dict):
+        """
+            Gets attributes from XML dictionary and sets them as object
+            attributes
+        """
+        ignored_attrs = {"class", "XMLID"}
+        init_dict = {}
+        cls_instance = BTRFS(**init_dict)
+        # Now, set all attributes we can set.
+        for attr in xml_dict:
+            try:
+                if attr in ignored_attrs:
+                    continue
+                setattr(cls_instance, attr, xml_dict.get(attr))
+            except:
+                continue
+
+        return cls_instance
+
     def __init__(self, **kwargs):
         super(BTRFS, self).__init__(**kwargs)
         self.vol_uuid = kwargs.pop("vol_uuid", None)
