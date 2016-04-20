@@ -47,6 +47,7 @@ from . import arch
 from . import devicefactory
 from . import get_sysroot, short_product_name, __version__
 from .threads import SynchronizedMeta
+
 from . import xml_util
 
 import logging
