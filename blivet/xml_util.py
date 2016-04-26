@@ -499,12 +499,13 @@ class FromXML(object):
         dev_str_type = dev_elem.attrib.get("type")
         dev_id = dev_elem.attrib.get("ObjectID")
         dev_dict = {"class": self._fxml_process_module(dev_str_type), "XMLID": dev_id}
-        ign_atts = {"children", "ancestors"}
+        # We don't want these attributes to be processed, because they are processed automatically
+        ign_atts = {"children", "ancestors", "lvs", "thinpools", "thinlvs"}
 
-        postprocess_attrs = {"lvs", "cached_lvs", "_internal_lvs"}
+        # TODO: dokoncit cached_lvs, _internal_lvs
+        postprocess_attrs = {"cached_lvs", "_internal_lvs"}
         id_list.append(dev_id)
 
-        print ("elem: ", dev_id, "id_list: ", id_list)
         for attr_elem in dev_elem:
             tmp_attr = attr_elem.attrib.get("attr")
             if tmp_attr in ign_atts:
@@ -519,8 +520,13 @@ class FromXML(object):
         else:
             print (dev_dict)
 
-
-
+## POSTPROCESSING: Vyhledavej pres ids_done - melo by fungovat
+    def from_xml_postprocess(self):
+        """
+            Based on stacked data, performs post-import processing to import and
+            process data we were unable to process in normal import
+        """
+        pass
 ################################################################################
 ####################### Tooling functions ######################################
     def _fxml_determine_type(self, in_elem, in_dict=None,
@@ -553,7 +559,6 @@ class FromXML(object):
 
         # Any attribute that is a link to a object
         if tmp_str_type == "ObjectID" and in_elem.text not in id_list:
-            print ("ID to process:", in_elem.text)
             if in_dict is None:
                 return self._fxml_process_object(in_elem, id_list)
             in_dict[tmp_attr] = self._fxml_process_object(in_elem, id_list)
