@@ -23,6 +23,7 @@ def create_basics():
     super_elems.append(ET.SubElement(root_elem, "Devices"))
     super_elems.append(ET.SubElement(root_elem, "Formats"))
     super_elems.append(ET.SubElement(root_elem, "InternalDevices"))
+    super_elems.append(ET.SubElement(root_elem, "Actions"))
     return (root_elem, super_elems)
 
 def save_file(root_elem, dump_device=None, custom_name=None, rec_bool=False):
@@ -460,6 +461,7 @@ class FromXML(object):
         self.fxml_tree_devices = self.fxml_tree_root.find("./Devices")
         self.fxml_tree_formats = self.fxml_tree_root.find("./Formats")
         self.fxml_tree_interns = self.fxml_tree_root.find("./InternalDevices")
+        self.fxml_tree_actions = self.fxml_tree_root.find("./Actions")
         # Lists to store devices to - Preparation
 
         # Pouzit ids_done jako kontrolu proti rekurzi
@@ -469,65 +471,158 @@ class FromXML(object):
         # Define devicetree / populator
         self.devicetree = devicetree
 
-        self.visited_ids = set()
-
 ################################################################################
-############ ITERATION #########################################################
+####################### Iteration ##############################################
     def from_xml(self):
         """
-            Parses element from device. Creates a class for device and prepares
-            basic parsing.
+            Walks through tree_devices
         """
-        # TEST OVERRIDE
-        #self.fxml_tree_devices = [self.fxml_tree_root.find(".//MDRaidArrayDevice")]
-        #self.fxml_tree_devices = [self.fxml_tree_devices[0]]
+        # DEBUG:
+        #self.fxml_tree_devices = [self.fxml_tree_devices[10]]
+        #self.fxml_tree_devices = self.fxml_tree_interns
 
         for dev_elem in self.fxml_tree_devices:
-            # Get ID and check if it is already done - little optimalization
-            tmp_id = dev_elem.attrib.get("ObjectID")
-            if self.ids_done.get(tmp_id) is not None:
+            dev_id = dev_elem.attrib.get("ObjectID")
+            if self.ids_done.get(dev_id) is not None:
                 continue
-            # Get class object
-            tmp_cls = self._fxml_determine_type(dev_elem, tmp_id)
-            dev_dict = {"class": tmp_cls, "XMLID": tmp_id}
-            # Start parsing attributes
-            self.from_xml_internal(dev_elem, dev_dict, debug=True)
-            # print (dev_dict)
+            self.from_xml_internal(dev_elem, debug=False)
 
-    def from_xml_internal(self, dev_elem, in_dict, debug=False):
+    def from_xml_internal(self, dev_elem, id_list=list(), debug=False):
         """
-            Docstring
-        """
-        current_id = in_dict.get("XMLID")
-        ign_atts = {"children", "ancestors", "lvs", "_internal_lvs"}
+            This loop function basically creates all of the information - Gets
+            class of the device and also it's ID and then processes all attributes
+            that are tied to a device
 
+            if param debug is True: processes a object and initializes it. else
+            it just gives back the dev_dict
+        """
+        dev_str_type = dev_elem.attrib.get("type")
+        dev_id = dev_elem.attrib.get("ObjectID")
+        dev_dict = {"class": self._fxml_process_module(dev_str_type), "XMLID": dev_id}
+        ign_atts = {"children", "ancestors"}
+
+        postprocess_attrs = {"lvs", "cached_lvs", "_internal_lvs"}
+        id_list.append(dev_id)
+
+        print ("elem: ", dev_id, "id_list: ", id_list)
         for attr_elem in dev_elem:
             tmp_attr = attr_elem.attrib.get("attr")
-            if  tmp_attr in ign_atts:
+            if tmp_attr in ign_atts:
                 continue
-            else:
-                in_dict[tmp_attr] = self._fxml_determine_type(attr_elem, current_id)
-        if debug:
-            return in_dict
+            if tmp_attr in postprocess_attrs:
+                continue
+            self._fxml_determine_type(attr_elem, in_dict=dev_dict, id_list=id_list)
+
+        if not debug:
+            del id_list[-1]
+            return self._fxml_finalize_object(dev_dict)
         else:
-            self._fxml_finalize_object(in_dict)
+            print (dev_dict)
+
+
 
 ################################################################################
-########## Tools ###############################################################
-    def _fxml_determine_object(self, in_elem, process_id, in_id):
+####################### Tooling functions ######################################
+    def _fxml_determine_type(self, in_elem, in_dict=None,
+                             in_attr=None, id_list=None, debug=False):
         """
-            Determines, what to do with current ID, if to skip it or process it.
-        """
-        # Get object, if it is already complete
-        if self.ids_done.get(process_id) is not None:
-            return self.ids_done.get(process_id)
-        elif process_id in self.visited_ids:
-            print (in_elem.attrib.get("attr"))
-            return None
-        else:
-            return self._fxml_process_object(process_id, in_id)
+            This determines between basic simple type (iterables and simple) and
+            complex, like attributes containing a dot and ObjectID, which we
+            want to process separatelly.
 
-    def _fxml_get_module(self, tmp_str_type):
+            Note: in_dict is allowed to be passed just when beggining typing the
+            attribute.
+
+            in_elem is required, because we need to parse information from the
+            element.
+
+            Processing: if the in_dict is None, then it will return the value
+            if not, value is directly written in in_dict[tmp_attr]
+
+            If debug parameterer is False, all of the types are processed. If not,
+            only complex attributes and objects are processed.
+        """
+        # Define basic types
+        iterables = {"list", "dict", "tuple"}
+        simples = {"str", "int", "float", "bool"}
+        # Get tempovary type
+        tmp_str_type = in_elem.attrib.get("type")
+        tmp_attr = in_elem.attrib.get("attr")
+        if tmp_attr is None:
+            tmp_attr = in_attr
+
+        # Any attribute that is a link to a object
+        if tmp_str_type == "ObjectID" and in_elem.text not in id_list:
+            print ("ID to process:", in_elem.text)
+            if in_dict is None:
+                return self._fxml_process_object(in_elem, id_list)
+            in_dict[tmp_attr] = self._fxml_process_object(in_elem, id_list)
+        # Any simple
+        elif tmp_str_type in simples:
+            if in_dict is None:
+                return self._fxml_process_simple(in_elem)
+            in_dict[tmp_attr] = self._fxml_process_simple(in_elem)
+        # Any iterable
+        elif tmp_str_type in iterables or "ParentList" in tmp_str_type:
+            if in_dict is None:
+                return self._fxml_process_iterables(in_elem, id_list)
+            in_dict[tmp_attr] = self._fxml_process_iterables(in_elem, id_list)
+        # Any complex
+        if "." in tmp_str_type and "ParentList" not in tmp_str_type:
+            if in_dict is None:
+                return self._fxml_determine_complex(in_elem)
+            in_dict[tmp_attr] = self._fxml_determine_complex(in_elem)
+
+    def _fxml_determine_complex(self, in_elem):
+        """
+            Determines, what type of complex object we are processing
+        """
+        tmp_str_type = in_elem.attrib.get("type")
+        tmp_value = in_elem.text
+        tmp_class = self._fxml_process_module(tmp_str_type)
+
+        # Occasion for size
+        if "Size" in tmp_str_type:
+            return tmp_class(int(tmp_value))
+        # Occasion for raid-s
+        elif tmp_str_type.startswith("blivet.devicelibs.raid"):
+            return tmp_value
+        # Occasion for object that was re-typed on export
+        elif in_elem.attrib.get("enforced") is not None:
+            return self._fxml_process_object_inelem(in_elem)
+        # return the class itself if everything fails
+        else:
+            return tmp_class
+
+################################################################################
+####################### Attribute processing functions #########################
+    def _fxml_process_object_inelem(self, in_elem):
+        """
+            Process any object that has ObjectID, but not in separate segment
+        """
+#        tmp_str_type = in_elem.attrib.get("type")
+#        tmp_obj = self._fxml_process_module(tmp_str_type)
+#        tmp_dict = {"class": tmp_obj}
+#        tmp_dict["XMLID"] = in_elem.attrib.get("ObjectID")
+#
+#        tmp_value = self.from_xml_internal(in_elem)
+        tmp_value = None
+        return tmp_value
+
+    def _fxml_process_object(self, in_elem, id_list):
+        """
+            Processes object
+        """
+        process_id = in_elem.text
+        tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (process_id))
+        # Check for devicetree, if it already exists so we can skip it
+        dev_tree_name = tmp_element.find("./*[@attr='name']").text
+        if self.devicetree.get_device_by_name(dev_tree_name) is not None:
+            return self.devicetree.get_device_by_name(dev_tree_name)
+        else:
+            return self.from_xml_internal(tmp_element, id_list)
+
+    def _fxml_process_module(self, tmp_str_type):
         """
             Reconstructs the class based on type
             Returns: class
@@ -553,103 +648,6 @@ class FromXML(object):
             tmp_class_obj = getattr(importlib.import_module(tmp_imp_path), tmp_mod_name)
             self.fulltypes_stack.update({tmp_str_type: tmp_class_obj})
             return tmp_class_obj
-
-    def _fxml_determine_complex(self, in_elem):
-        """
-            Determines, what type of complex object we are processing
-        """
-        tmp_str_type = in_elem.attrib.get("type")
-        tmp_value = in_elem.text
-        tmp_class = self._fxml_get_module(tmp_str_type)
-
-        # Occasion for size
-        if "Size" in tmp_str_type:
-            return tmp_class(int(tmp_value))
-        # Occasion for raid-s
-        elif tmp_str_type.startswith("blivet.devicelibs.raid"):
-            return tmp_value
-        # Occasion for object that was re-typed on export
-        elif in_elem.attrib.get("enforced") is not None:
-            pass
-        # return the class itself if everything fails
-        else:
-            return tmp_class
-
-    def _fxml_determine_type(self, in_elem, in_id, in_attr=None):
-        """
-            Determines a object type from element
-        """
-        # Define basic types
-        iterables = {"list", "dict", "tuple"}
-        simples = {"str", "int", "float", "bool"}
-        # Get tempovary type
-        tmp_str_type = in_elem.attrib.get("type")
-        tmp_attr = in_elem.attrib.get("attr")
-        if tmp_attr is None:
-            tmp_attr = in_attr
-
-        # Occasion for any complex type excluding ParentList
-        if "." in tmp_str_type and "ParentList" not in tmp_str_type:
-            tmp_value = self._fxml_determine_complex(in_elem)
-        # Any simple attribute like text, bool..
-        elif tmp_str_type in simples:
-            tmp_value = self._fxml_process_simple(in_elem)
-        # Any iterable, including ParentList
-        elif tmp_str_type in iterables or "ParentList" in tmp_str_type:
-            tmp_value = self._fxml_process_iterables(in_elem, in_id)
-        # Any object, that is linked with its ID
-        elif tmp_str_type == "ObjectID":
-            if in_id == in_elem.text:
-                return "cls_inst"
-            else:
-                tmp_value = self._fxml_determine_object(in_elem, in_elem.text, in_id)
-        else:
-            tmp_value = None
-        return tmp_value
-
-################################################################################
-########## Attribute parsing ###################################################
-    def _fxml_process_object(self, process_id, in_id):
-        """
-            Processes object that is linked by ObjectID
-        """
-        # Find the object and create its class
-        tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (process_id))
-        tmp_cls = self._fxml_determine_type(tmp_element, in_id)
-        dev_dict = {"class": tmp_cls, "XMLID": process_id}
-        # Check against already processing ids
-        self.visited_ids.add(process_id)
-        self.from_xml_internal(tmp_element, dev_dict)
-        self.visited_ids.discard(process_id)
-        return self._fxml_finalize_object(dev_dict)
-
-    def _fxml_finalize_object(self, in_dict):
-        """
-            Completes and initalizes object based on dictionary provided
-        """
-        # First, get all basic data
-        tmp_class = in_dict.get("class")
-        tmp_id = in_dict.get("XMLID")
-        # Init the object
-        tmp_obj = tmp_class.__init_xml__(in_dict)
-        result = self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (tmp_id)).tag
-
-        if self.ids_done.get(tmp_id) is None:
-            self.ids_done[tmp_id] = tmp_obj
-            if result == "Devices":
-                self.devicetree._add_device(tmp_obj)
-        return tmp_obj
-
-         #Get element
-
-#        # Start processing
-#        tmp_cls = self._fxml_determine_type(tmp_element, in_id)
-#        # Create dict and fill basic info
-#        dev_dict = {"class": tmp_cls}
-#        dev_dict["XMLID"] =  tmp_element.attrib.get("ObjectID")
-#        # Start processing
-#        tmp_object = self.from_xml_internal(tmp_element, dev_dict)
-#        return tmp_object
 
     def _fxml_process_simple(self, in_elem):
         """
@@ -677,7 +675,7 @@ class FromXML(object):
             tmp_value = simple_values.get(tmp_value)
         return tmp_value
 
-    def _fxml_process_iterables(self, in_elem, in_id):
+    def _fxml_process_iterables(self, in_elem, id_list):
         """
             Any iterable type
         """
@@ -695,7 +693,9 @@ class FromXML(object):
         # Finally, start iterating
         for item_elem in in_elem: # Not to be confused, this element has children
             # Preliminary check for IDs
-            tmp_value = self._fxml_determine_type(item_elem, in_id, in_attr=tmp_attr)
+            if item_elem.attrib.get("ObjectID") is not None and item_elem.text in id_list:
+                continue
+            tmp_value = self._fxml_determine_type(item_elem, id_list=id_list, in_attr=tmp_attr)
 
             # Determine, which type of list to use
             if type(list_object) is list:
@@ -711,18 +711,32 @@ class FromXML(object):
             tmp_value = tuple(list_object)
         return list_object
 
+    def _fxml_process_object(self, in_elem, id_list):
+        """
+            Processes object
+        """
+        process_id = in_elem.text
+        tmp_element = self.fxml_tree_root.find(".//*[@ObjectID='%s']" % (process_id))
+        if self.ids_done.get(process_id) is not None:
+            return self.ids_done.get(process_id)
+        else:
+            return self.from_xml_internal(tmp_element, id_list=id_list)
 
+################################################################################
+########## Object finalization #################################################
+    def _fxml_finalize_object(self, in_dict):
+        """
+            Completes and initalizes object based on dictionary provided
+        """
+        # First, get all basic data
+        tmp_class = in_dict.get("class")
+        tmp_id = in_dict.get("XMLID")
+        # Init the object
+        tmp_obj = tmp_class.__init_xml__(in_dict)
+        result = self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (tmp_id)).tag
 
-#    def _fxml_process_object_inelem(self, in_elem):
-#        """
-#            Process any object that has ObjectID, but not in separate segment
-#        """
-#        tmp_str_type = in_elem.attrib.get("type")
-#        tmp_obj = self._fxml_get_module(tmp_str_type)
-#        tmp_dict = {"class": tmp_obj}
-#        tmp_dict["XMLID"] = in_elem.attrib.get("ObjectID")
-#
-#        tmp_value = self.from_xml_internal(in_elem, tmp_dict)
-#        return tmp_value
-#
-#
+        if self.ids_done.get(tmp_id) is None:
+            self.ids_done[tmp_id] = tmp_obj
+        if result == "Devices" and tmp_obj not in self.devicetree.devices:
+            self.devicetree._add_device(tmp_obj)
+        return tmp_obj
