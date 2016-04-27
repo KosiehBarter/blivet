@@ -470,6 +470,8 @@ class FromXML(object):
         self.fulltypes_stack = {}
         # Define devicetree / populator
         self.devicetree = devicetree
+        # Post-processing dictionary
+        self.post_process_list = []
 
 ################################################################################
 ####################### Iteration ##############################################
@@ -519,6 +521,7 @@ class FromXML(object):
             if tmp_attr in ign_atts:
                 continue
             if tmp_attr in postprocess_attrs:
+                self.post_process_list.append(FXMLPostProcess(tmp_attr, dev_elem, attr_elem, id_list[-1]))
                 continue
             self._fxml_determine_type(attr_elem, in_dict=dev_dict, id_list=id_list)
 
@@ -535,6 +538,21 @@ class FromXML(object):
             process data we were unable to process in normal import
         """
         self.from_xml(in_list=self.fxml_tree_interns, ign_atts={"ancestors", "parents", "_internal_lvs"})
+
+        for dev_cls in self.post_process_list:
+            elem = dev_cls.elem
+            tmp_obj = self.ids_done.get(dev_cls.cur_id)
+            if elem.attrib.get("type") == "list":
+                tmp_value = []
+                for attr_elem in elem:
+                    tmp_value.append(self.ids_done.get(attr_elem.text))
+            else:
+                tmp_value = self.ids_done.get(elem.text)
+
+            if dev_cls.tmp_attr == "cached_lvs":
+                dev_cls.tmp_attr = "_cached_lvs"
+            setattr(tmp_obj, dev_cls.tmp_attr, tmp_value)
+
 ################################################################################
 ####################### Tooling functions ######################################
     def _fxml_determine_type(self, in_elem, in_dict=None,
@@ -745,3 +763,17 @@ class FromXML(object):
         elif result == "Devices" and tmp_obj not in self.devicetree.devices:
             self.devicetree._add_device(tmp_obj)
         return tmp_obj
+
+################################################################################
+########## Helper postprocessing class #########################################
+class FXMLPostProcess(object):
+    """
+        Defines a simple class to assist postprocess
+    """
+    def __init__(self, attr, dev_elem, cur_elem, in_id):
+        super(FXMLPostProcess, self).__init__()
+        self.tmp_attr = attr
+        self.cur_id = in_id
+        self.elem = cur_elem
+        self.dev_elem = dev_elem
+        self.tmp_id = dev_elem.attrib.get("ObjectID")
