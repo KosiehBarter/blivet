@@ -444,6 +444,7 @@ class PopulatorMixin(object, metaclass=SynchronizedMeta):
             if self.xml_file is not None:
                 XMLImporter = xml_util.FromXML(self.xml_file, self)
                 XMLImporter.from_xml()
+                XMLImporter.from_xml_postprocess()
             else:
                 self._populate()
         except Exception:

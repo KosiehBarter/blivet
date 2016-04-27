@@ -473,21 +473,25 @@ class FromXML(object):
 
 ################################################################################
 ####################### Iteration ##############################################
-    def from_xml(self):
+    def from_xml(self, in_list=None, ign_atts=None, postprocess_attrs=None):
         """
             Walks through tree_devices
         """
         # DEBUG:
         #self.fxml_tree_devices = [self.fxml_tree_devices[10]]
         #self.fxml_tree_devices = self.fxml_tree_interns
+        if in_list is None:
+            in_list = self.fxml_tree_devices
 
-        for dev_elem in self.fxml_tree_devices:
+        for dev_elem in in_list:
             dev_id = dev_elem.attrib.get("ObjectID")
             if self.ids_done.get(dev_id) is not None:
                 continue
-            self.from_xml_internal(dev_elem, debug=False)
+            self.from_xml_internal(dev_elem, debug=False,
+                                   ign_atts=ign_atts, postprocess_attrs=postprocess_attrs)
 
-    def from_xml_internal(self, dev_elem, id_list=list(), debug=False):
+    def from_xml_internal(self, dev_elem, id_list=list(),
+                          debug=False, ign_atts=None, postprocess_attrs=None):
         """
             This loop function basically creates all of the information - Gets
             class of the device and also it's ID and then processes all attributes
@@ -500,10 +504,14 @@ class FromXML(object):
         dev_id = dev_elem.attrib.get("ObjectID")
         dev_dict = {"class": self._fxml_process_module(dev_str_type), "XMLID": dev_id}
         # We don't want these attributes to be processed, because they are processed automatically
-        ign_atts = {"children", "ancestors", "lvs", "thinpools", "thinlvs"}
+        if ign_atts is None:
+            ign_atts = {"children", "ancestors", "lvs", "thinpools", "thinlvs"}
 
         # TODO: dokoncit cached_lvs, _internal_lvs
-        postprocess_attrs = {"cached_lvs", "_internal_lvs"}
+        if postprocess_attrs is None:
+            postprocess_attrs = {"cached_lvs", "_internal_lvs", "cached_lv"}
+
+        # Append ID to control list so we can skip it if we'll find it somewhere else
         id_list.append(dev_id)
 
         for attr_elem in dev_elem:
@@ -526,7 +534,7 @@ class FromXML(object):
             Based on stacked data, performs post-import processing to import and
             process data we were unable to process in normal import
         """
-        pass
+        self.from_xml(in_list=self.fxml_tree_interns, ign_atts={"ancestors", "parents", "_internal_lvs"})
 ################################################################################
 ####################### Tooling functions ######################################
     def _fxml_determine_type(self, in_elem, in_dict=None,
@@ -573,7 +581,7 @@ class FromXML(object):
                 return self._fxml_process_iterables(in_elem, id_list)
             in_dict[tmp_attr] = self._fxml_process_iterables(in_elem, id_list)
         # Any complex
-        if "." in tmp_str_type and "ParentList" not in tmp_str_type:
+        elif "." in tmp_str_type and "ParentList" not in tmp_str_type:
             if in_dict is None:
                 return self._fxml_determine_complex(in_elem)
             in_dict[tmp_attr] = self._fxml_determine_complex(in_elem)
@@ -593,27 +601,14 @@ class FromXML(object):
         elif tmp_str_type.startswith("blivet.devicelibs.raid"):
             return tmp_value
         # Occasion for object that was re-typed on export
-        elif in_elem.attrib.get("enforced") is not None:
-            return self._fxml_process_object_inelem(in_elem)
+        elif in_elem.attrib.get("ObjectID") is not None:
+            return self.from_xml_internal(in_elem)
         # return the class itself if everything fails
         else:
             return tmp_class
 
 ################################################################################
 ####################### Attribute processing functions #########################
-    def _fxml_process_object_inelem(self, in_elem):
-        """
-            Process any object that has ObjectID, but not in separate segment
-        """
-#        tmp_str_type = in_elem.attrib.get("type")
-#        tmp_obj = self._fxml_process_module(tmp_str_type)
-#        tmp_dict = {"class": tmp_obj}
-#        tmp_dict["XMLID"] = in_elem.attrib.get("ObjectID")
-#
-#        tmp_value = self.from_xml_internal(in_elem)
-        tmp_value = None
-        return tmp_value
-
     def _fxml_process_object(self, in_elem, id_list):
         """
             Processes object
@@ -740,8 +735,13 @@ class FromXML(object):
         tmp_obj = tmp_class.__init_xml__(in_dict)
         result = self.fxml_tree_root.find(".//*[@ObjectID='%s']/.." % (tmp_id)).tag
 
+        # Define LVMCache
+        LVMCache = getattr(importlib.import_module("blivet.devices.lvm"), "LVMCache")
+
         if self.ids_done.get(tmp_id) is None:
             self.ids_done[tmp_id] = tmp_obj
-        if result == "Devices" and tmp_obj not in self.devicetree.devices:
+        if isinstance(tmp_obj, LVMCache):
+            return tmp_obj
+        elif result == "Devices" and tmp_obj not in self.devicetree.devices:
             self.devicetree._add_device(tmp_obj)
         return tmp_obj

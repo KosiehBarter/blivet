@@ -1634,7 +1634,11 @@ class LVMLogicalVolumeDevice(LVMLogicalVolumeBase, LVMInternalLogicalVolumeMixin
             try:
                 if attr in ignored_attrs:
                     continue
-                setattr(cls_instance, attr, xml_dict.get(attr))
+                elif attr == "cache":
+                    obj_attr = "_cache"
+                else:
+                    obj_attr = attr
+                setattr(cls_instance, obj_attr, xml_dict.get(attr))
             except:
                 continue
 
@@ -2102,12 +2106,19 @@ class LVMCache(Cache, xml_util.XMLUtils):
                 ignored_attrs.add(arg)
 
         cls_instance = LVMCache(**init_dict)
+        # Define underscore attributes
+        underscore = {}
+
         # Now, set all attributes we can set.
         for attr in xml_dict:
             try:
                 if attr in ignored_attrs:
                     continue
-                setattr(cls_instance, attr, xml_dict.get(attr))
+                elif hasattr(cls_instance, "_" + attr):
+                    obj_attr = "_" + attr
+                else:
+                    obj_attr = attr
+                setattr(cls_instance, obj_attr, xml_dict.get(attr))
             except:
                 continue
 
