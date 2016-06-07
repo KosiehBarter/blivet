@@ -25,7 +25,9 @@ def create_basics():
     super_elems.append(ET.SubElement(root_elem, "InternalDevices"))
     super_elems.append(ET.SubElement(root_elem, "Actions"))
     super_elems.append(ET.SubElement(root_elem, "DestroyedDevices"))
+    super_elems[-1].set("Count", "0")
     super_elems.append(ET.SubElement(root_elem, "DestroyedFormats"))
+    super_elems[-1].set("Count", "0")
     return (root_elem, super_elems)
 
 def save_file(root_elem, dump_device=None, custom_name=None, rec_bool=False):
@@ -633,6 +635,7 @@ class FromXML(object):
         if not debug:
             action = self._fxml_finalize_object(act_dict)
             self.devicetree.actions.add(action, xml_import=True)
+            self.devicetree._register_action(action, xml_import = True)
         else:
             print (act_dict)
 
