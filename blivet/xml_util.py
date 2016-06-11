@@ -634,8 +634,8 @@ class FromXML(object):
 
         if not debug:
             action = self._fxml_finalize_object(act_dict)
-            self.devicetree.actions.add(action, xml_import=True)
-            self.devicetree._register_action(action, xml_import = True)
+            self.devicetree._actions.add(action, xml_import=True)
+            self.devicetree._actions.find()[-1].apply()
         else:
             print (act_dict)
 
